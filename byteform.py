@@ -5,47 +5,64 @@ import struct
 # from C structs. The actual outcome is partly based on the machine type, so we
 # need to abstract this a bit.
 
+# A small problem arises because in Python < 2.5, no checking is done on the
+# number range when byte order and alignment are specified. So we need to do
+# this ourselves. These tables specify the lower and upper bounds for both
+# unsigned (False) and signed (True) integer numbers.
+# For floating point numbers, this is not needed, since otherwise 0 or infinity
+# are assumed.
+min_int_values = {
+  False: {1: 0, 2: 0, 4: 0},
+  True:  {1: -128, 2: -32768, 4: -2147483648}
+}
+max_int_values = {
+  False: {1: 255,  2: 65535,  4: 4294967295},
+  True:  {1: 127,  2: 32767,  4: 2147483647}
+}
+
 def itob(num, num_bytes, signed = False, big_endian = True):
   """ Converts an integer number to its binary representation, with the
       required number of bytes (1, 2 or 4). """
-      
+  
+  if (num < min_int_values[signed][num_bytes]) or (num > max_int_values[signed][num_bytes]):
+    raise "The integer number falls outside the range for encoding!"
+    
   control_chars = __getIntControlChars(num_bytes, signed, big_endian)
   return struct.pack(control_chars, num)
     
 def btoi(bytes, signed = False, big_endian = True):
   """ Converts a string of bytes to its integer number. The string should
       contain either 1, 2 or 4 bytes. """
-      
+    
   control_chars = __getIntControlChars(len(bytes), signed, big_endian)
   return struct.unpack(control_chars, bytes)[0]
   
-def ftob(num, double = False, big_endian = True):
+def ftob(num, num_bytes, big_endian = True):
   """ Converts a floating point number to its IEEE representation. """
   
-  control_chars = __getFloatControlChars(num_bytes, signed, big_endian)
+  control_chars = __getFloatControlChars(num_bytes, big_endian)
   return struct.pack(control_chars, num)
   
 def btof(bytes, big_endian = True):
   """ Converts a byte stream to a floating point IEEE representation. """
   
-  control_chars = __getFloatControlChars(num_bytes, signed, big_endian)
-  return struct.pack(control_chars, num)
+  control_chars = __getFloatControlChars(len(bytes), big_endian)
+  return struct.unpack(control_chars, bytes)
   
-def rtob(num, signed = False, big_endian = True):
-  """ Converts a floating point number to a rational byte representation. """
-  
+def rtob(num, num_bytes, signed = False, big_endian = True):
+  """ Converts a floating point number to a rational byte representation. 
+      num_bytes specifies how many bytes the total representation takes, so each
+      part of the rational gets half that many bytes. """
+      
   # We take a lazy approach, by making the denominator only a power of ten
-  
-  if (signed):
-    max_num = 2147483647
-  else:
-    max_num = 4294967295
-    
-  too_small = False
+
+  num_bytes /= 2
   
   # First, find out the multiplier and denominator to get a fraction between 1
   # and 10, or stop when it gets too large. In this case, the number is too
-  # small and we need to raise an alert.
+  # small and we simply set it to 0.
+  max_num    = max_int_values[signed][num_bytes]
+  too_small  = False
   multiplier = 1.0
   while (abs(num * multiplier) < 1):
     multiplier *= 10
@@ -64,12 +81,12 @@ def rtob(num, signed = False, big_endian = True):
     frac  = 0
     denom = 1
   else:
-    frac  = long(num * multiplier)
-    denom = long(multiplier)
+    frac  = int(num * multiplier)
+    denom = int(multiplier)
     
   # Create the byte stream
-  byte_str =  itob(frac, 4, signed, big_endian)
-  byte_str += itob(denom, 4, signed, big_endian)
+  byte_str =  itob(frac, num_bytes, signed, big_endian)
+  byte_str += itob(denom, num_bytes, signed, big_endian)
   return byte_str
   
 def btor(byte_str, signed = False, big_endian = True):
@@ -85,7 +102,7 @@ def btor(byte_str, signed = False, big_endian = True):
   
   return frac / denom
   
-def __getIntControlChars(length, signed, big_endian):
+def __getIntControlChars(length, signed, big_endian = True):
   """ Chooses the format character for struct.(un)pack for integer numbers. """
   
   # Choose the format letter

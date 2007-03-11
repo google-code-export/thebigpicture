@@ -12,7 +12,7 @@ class MetaInfoFile:
     # Iterate over all IFD's
     for ifd in ['tiff', 'exif', 'gps']:
       if (self.ifds[ifd]):
-        payload = self.ifds[ifd].getPayload(tag)
+        payload = self.ifds[ifd].getTagPayload(tag)
         if payload:
           break
 

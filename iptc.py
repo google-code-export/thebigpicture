@@ -1,4 +1,5 @@
-from helper import convBytes2Int, convBytes2Float
+#from helper import convBytes2Int, convBytes2Float
+import byteform
 
 class IPTC:
   def __init__(self, fp, file_offset, size):
@@ -14,8 +15,8 @@ class IPTC:
     curr_byte = 0
     #while (curr_byte <= length):
     while ((self.fp.read(2) == "\x1c\x02") and (curr_byte < self.size)):
-      tag_type = convBytes2Int(self.fp.read(1))
-      length   = convBytes2Int(self.fp.read(2))
+      tag_type = byteform.btoi(self.fp.read(1))
+      length   = byteform.btoi(self.fp.read(2))
       if (tag_type in self.tags):
         self.tags[tag_type].append(self.fp.read(length))
       else:

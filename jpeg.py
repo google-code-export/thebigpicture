@@ -1,5 +1,5 @@
-import exif, tiff, metainfofile, iptc
-from helper import convBytes2Int
+import exif, tiff, metainfofile, iptc, byteform
+#from helper import convBytes2Int
 
 import types
 
@@ -61,11 +61,11 @@ class JPEG(metainfofile.MetaInfoFile):
         is_jpeg = False
       if ((data[1] == '\xd9') or (data[1] == '\xda')): # SOS and EOI
         break
-      part_type = convBytes2Int(data[1], self.is_be)
+      part_type = byteform.btoi(data[1], big_endian = self.is_be)
       
       # The lenght of the part is determined in the following two bytes, and
       # these are included in the length.
-      part_len = convBytes2Int(self.fp.read(2), self.is_be)
+      part_len = byteform.btoi(self.fp.read(2), big_endian = self.is_be)
       self.segments[part_type] = [self.fp.tell(), part_len]
       self.fp.seek(self.fp.tell() + part_len - 2)
 
@@ -91,7 +91,7 @@ class JPEG(metainfofile.MetaInfoFile):
     if (not self.iptc_info) and (237 in self.segments): 
       self.fp.seek(self.segments[237][0])
       if (self.fp.read(24) == "Photoshop 3.0\x008BIM\x04\x04\x00\x00\x00\x00"): # FIXME: I don't understand these Photosop 8BIM structures, if only IPTC info is present in APP13, the header looks like this.
-        self.iptc_info = iptc.IPTC(self.fp, self.fp.tell() + 2, convBytes2Int(self.fp.read(2)))
+        self.iptc_info = iptc.IPTC(self.fp, self.fp.tell() + 2, byteform.btoi(self.fp.read(2)))
           
     if not (is_jpeg):
       raise "File is not JPEG"

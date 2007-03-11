@@ -1,6 +1,5 @@
 # Import local classes
-import ifd, exif, iptc, metainfofile
-from helper import convBytes2Int, convInt2Bytes
+import ifd, exif, iptc, metainfofile, byteform
 
 # Import python modules
 import types
@@ -39,7 +38,7 @@ class Tiff(metainfofile.MetaInfoFile):
       is_tiff = True
       
     # The next two bytes should be 42
-    if (is_tiff) and (convBytes2Int(self.fp.read(2), self.is_be) == 42):
+    if (is_tiff) and (byteform.btoi(self.fp.read(2), big_endian = self.is_be) == 42):
       is_tiff = True
       
     # If the file does not have a Tiff header, report it as false 
@@ -50,16 +49,16 @@ class Tiff(metainfofile.MetaInfoFile):
     
     # Get the first IFD (The "Tiff" tags)
     ifd_offsets = {}
-    ifd_offsets["tiff"] = convBytes2Int(self.fp.read(4), self.is_be)
+    ifd_offsets["tiff"] = byteform.btoi(self.fp.read(4), big_endian = self.is_be)
     self.ifds["tiff"] = exif.TIFF(self.fp, ifd_offsets["tiff"], offset, self.is_be)
     
     # Get the Exif tags
-    ifd_offsets["exif"] = self.ifds["tiff"].getPayload("Exif IFD Pointer")
+    ifd_offsets["exif"] = self.ifds["tiff"].getTagPayload("Exif IFD Pointer")
     if (ifd_offsets["exif"]):
       self.ifds["exif"] = exif.Exif(self.fp, ifd_offsets["exif"], offset, self.is_be)
       
     # Get the GPS tags
-    ifd_offsets["gps"] = self.ifds["tiff"].getPayload("GPSInfo IFD Pointer")
+    ifd_offsets["gps"] = self.ifds["tiff"].getTagPayload("GPSInfo IFD Pointer")
     if (ifd_offsets["gps"]):
       self.ifds["gps"] = exif.GPS(self.fp, ifd_offsets["gps"], offset, self.is_be)
 
@@ -85,10 +84,15 @@ class Tiff(metainfofile.MetaInfoFile):
       out_fp.write("\x4d\x4d")
     else:
       out_fp.write("\x49\x49")
-    out_fp.write(convInt2Bytes(42, 2, self.is_be))
-    out_fp.write(convInt2Bytes(8, 4, self.is_be))
-    entry_stream, data_stream = self.ifds["tiff"].getByteStream(12) # 8 bytes header + 4 bytes at end of entry stream
-    out_fp.write(entry_stream)
-    out_fp.write(convInt2Bytes(0, 4, self.is_be))
-    out_fp.write(data_stream)
+    out_fp.write(byteform.itob(42, 2, big_endian = self.is_be))
+    out_fp.write(byteform.itob(8, 4, big_endian = self.is_be))
+    exif_ifd_offset = self.ifds["tiff"].getSize() + 8
+    gps_ifd_offset = exif_ifd_offset + self.ifds["exif"].getSize()
+
+    self.ifds["tiff"].setTagPayload("Exif IFD Pointer", exif_ifd_offset)
+    self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", gps_ifd_offset)
+    
+    out_fp.write(self.ifds["tiff"].getByteStream(8))
+    out_fp.write(self.ifds["exif"].getByteStream(exif_ifd_offset))
+    out_fp.write(self.ifds["gps"].getByteStream(gps_ifd_offset))
     out_fp.close()
