@@ -1,0 +1,3 @@
+import byteform
+
+print repr(byteform.btor("\x11\x11\x11\x11\x22\x22\x22\x22"))

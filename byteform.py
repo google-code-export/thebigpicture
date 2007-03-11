@@ -1,0 +1,137 @@
+""" This module converts data to their byte-representation and vice versa. """
+
+import struct
+# The conversions are mostly based on the struct module, which converts to and
+# from C structs. The actual outcome is partly based on the machine type, so we
+# need to abstract this a bit.
+
+def itob(num, num_bytes, signed = False, big_endian = True):
+  """ Converts an integer number to its binary representation, with the
+      required number of bytes (1, 2 or 4). """
+      
+  control_chars = __getIntControlChars(num_bytes, signed, big_endian)
+  return struct.pack(control_chars, num)
+    
+def btoi(bytes, signed = False, big_endian = True):
+  """ Converts a string of bytes to its integer number. The string should
+      contain either 1, 2 or 4 bytes. """
+      
+  control_chars = __getIntControlChars(len(bytes), signed, big_endian)
+  return struct.unpack(control_chars, bytes)[0]
+  
+def ftob(num, double = False, big_endian = True):
+  """ Converts a floating point number to its IEEE representation. """
+  
+  control_chars = __getFloatControlChars(num_bytes, signed, big_endian)
+  return struct.pack(control_chars, num)
+  
+def btof(bytes, big_endian = True):
+  """ Converts a byte stream to a floating point IEEE representation. """
+  
+  control_chars = __getFloatControlChars(num_bytes, signed, big_endian)
+  return struct.pack(control_chars, num)
+  
+def rtob(num, signed = False, big_endian = True):
+  """ Converts a floating point number to a rational byte representation. """
+  
+  # We take a lazy approach, by making the denominator only a power of ten
+  
+  if (signed):
+    max_num = 2147483647
+  else:
+    max_num = 4294967295
+    
+  too_small = False
+  
+  # First, find out the multiplier and denominator to get a fraction between 1
+  # and 10, or stop when it gets too large. In this case, the number is too
+  # small and we need to raise an alert.
+  multiplier = 1.0
+  while (abs(num * multiplier) < 1):
+    multiplier *= 10
+    if ((multiplier * num) > max_num):
+      multiplier /= 10
+      too_small = True
+      break
+
+  # Then, search for a multiplier where dividing the fraction on the denominator
+  # produces the number, or stop when it gets too large
+  while (float(long(num * multiplier) / multiplier) != num) and ((multiplier * num)> (max_num / 10)):
+    multiplier *= 10
+    
+  # Calculate the fraction, and set the denominator to the multiplier 
+  if (too_small):
+    frac  = 0
+    denom = 1
+  else:
+    frac  = long(num * multiplier)
+    denom = long(multiplier)
+    
+  # Create the byte stream
+  byte_str =  itob(frac, 4, signed, big_endian)
+  byte_str += itob(denom, 4, signed, big_endian)
+  return byte_str
+  
+def btor(byte_str, signed = False, big_endian = True):
+  """ Convert a byte stream to a rational number. """
+  
+  # Check for the proper number of bytes
+  if (len(byte_str) != 8):
+    raise "A rational number should contain exactly 8 bytes."
+  
+  # Get the fraction and denominator
+  frac  = float(btoi(byte_str[:4], signed, big_endian))
+  denom = float(btoi(byte_str[4:], signed, big_endian))
+  
+  return frac / denom
+  
+def __getIntControlChars(length, signed, big_endian):
+  """ Chooses the format character for struct.(un)pack for integer numbers. """
+  
+  # Choose the format letter
+  if (length == 1):
+    format = "b" # Char
+  elif (length == 2):
+    format = "h" # Short
+  elif (length == 4):
+    format = "l" # Long
+  else:
+    raise "You need either 1, 2, or 4 bytes for an integer number."
+
+  # Modify the format letter to either signed or unsigned
+  if (not signed):
+    format = format.upper()
+  
+  # Put the proper byte order and alignment character in front 
+  format = __getByteAlignmentChar(big_endian) + format
+  
+  return format
+  
+def __getFloatControlChars(length, big_endian):
+  """ Chooses the format character for struct.(un)pack for floating point
+      numbers. """
+      
+  # Choose the format letter
+  if (length == 4):
+    format = "f" # Float
+  elif (length == 8):
+    format = "d" # Double
+  else:
+    raise "You need either 4 or 8 bytes for a float."
+  
+  # Put the proper byte order and alignment character in front 
+  format = __getByteAlignmentChar(big_endian) + format
+  
+  return format
+
+def __getByteAlignmentChar(big_endian):
+  """ Choose the control character at the start of the byte string, for
+      representing byte order and alignment. """
+      
+  if (big_endian):
+    format = ">"
+  else:
+    format = "<"
+    
+  return format
+
