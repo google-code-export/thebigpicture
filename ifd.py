@@ -171,7 +171,7 @@ class IFD:
 
     # Calculate the offset at which we may write data (after the offset, 2 bytes
     # at the start of the IFD, 12 bytes for each field, and four bytes as
-    # pointer to the next IFD.
+    # pointer to the next IFD.2
     data_offset = offset + 12 * len(tag_nums) + 6
    
     # For writing the data, we split the stream in two; one part contains the
