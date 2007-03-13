@@ -187,7 +187,7 @@ class IFD:
         data_type, data = self.user_fields[tag_num]
       else:
         data_type = self.disk_fields[tag_num][1]
-        self.fp.seek(self.disk_fields[tag_num][0])
+        self.fp.seek(self.disk_fields[tag_num][0] + self.header_offset)
         data = self.fp.read(self.disk_fields[tag_num][2])
         
       count = len(data) / ifddatatypes.TYPES[data_type].word_width

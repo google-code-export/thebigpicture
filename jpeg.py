@@ -103,7 +103,7 @@ class JPEG(metainfofile.MetaInfoFile):
         # The lenght of the part is determined in the following two bytes, and
         # these are included in the length.
         part_len = byteform.btoi(self.fp.read(2), big_endian = self.is_be)
-        self.segments[part_type] = [self.fp.tell(), part_len]
+        self.segments[part_type] = [self.fp.tell(), part_len] # FIXME: reading [1] bytes from [0] reads two bytes too many
         self.fp.seek(self.fp.tell() + part_len - 2)
     
     # Check for a JPEG Comment
@@ -135,39 +135,64 @@ class JPEG(metainfofile.MetaInfoFile):
       raise "File is not JPEG"
       
   def writeFile(self, file_path):
+    # Open the new file for writing
     out_fp = file(file_path, "w")
     out_fp.write("\xff\xd8")
+    
+    # Iterate over all segments and copy them from the original file or rewrite
+    # them
     for segment in SEGMENTS:
       segment_num = SEG_NUMS[segment]
       if segment_num in self.segments:
+        
+        # Write the start of the segment
         out_fp.write("\xff")
         out_fp.write(byteform.itob(segment_num, 1))
+        
         if (segment_num == SEG_NUMS["APP1"]):
-          is_be = self.ifds["tiff"].is_be
-          exif_ifd_offset = self.ifds["tiff"].getSize() + 8
-          gps_ifd_offset = exif_ifd_offset + self.ifds["exif"].getSize()
+          # Write the Exif segment
+          
+          # The exif data can have a different endianness than the JPEG file
+          ifd_is_be = self.ifds["tiff"].is_be
+          
+          # Calculate the different byte offsets (within the segment)
+          exif_ifd_offset = self.ifds["tiff"].getSize() + 8 # 8 for Tiff header
+          gps_ifd_offset  = exif_ifd_offset + self.ifds["exif"].getSize()
+          
+          # Set the offsets to the tiff data
           self.ifds["tiff"].setTagPayload("Exif IFD Pointer", exif_ifd_offset)
           self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", gps_ifd_offset)
-          length = self.ifds['tiff'].getSize() + self.ifds['exif'].getSize() + self.ifds['gps'].getSize() + 2
-          out_fp.write(byteform.itob(length, 2))
+          
+          # Write the Exif header
+          # The length is the sum of the Exif fields, plus 2 bytes specifying
+          # the length off the segment, plus 6 bytes for the Exif header, plus
+          # 8 bytes for the Tiff header
+          length = self.ifds['tiff'].getSize() + self.ifds['exif'].getSize() + self.ifds['gps'].getSize() + 16
+          out_fp.write(byteform.itob(length, 2, big_endian = self.is_be))
           out_fp.write("Exif\x00\x00")
-          if (is_be):
+          
+          # Write the Tiff header
+          if (ifd_is_be):
             out_fp.write("\x4d\x4d")
           else:
             out_fp.write("\x49\x49")
-          out_fp.write(byteform.itob(42, 2, big_endian = is_be))
-          out_fp.write(byteform.itob(8, 4, big_endian = is_be))
+          out_fp.write(byteform.itob(42, 2, big_endian = ifd_is_be))
+          out_fp.write(byteform.itob(8, 4, big_endian = ifd_is_be))
+          
+          # Write the Exif IFD's
           out_fp.write(self.ifds["tiff"].getByteStream(8))
           out_fp.write(self.ifds["exif"].getByteStream(exif_ifd_offset))
           out_fp.write(self.ifds["gps"].getByteStream(gps_ifd_offset))
         elif (segment_num == SEG_NUMS["SOS"]):
+          # Write the actual image data and EOI
           self.fp.seek(self.segments[segment_num][0])
           out_fp.write(self.fp.read())
         else:
+          # Copy the segment literally from the original file
           out_fp.write(byteform.itob(self.segments[segment_num][1], 2))
           self.fp.seek(self.segments[segment_num][0])
           out_fp.write(self.fp.read(self.segments[segment_num][1] - 2))
-    #out_fp.write("\xff" + chr(SEG_NUMS["EOI"]))
+
     out_fp.close()
     
   def getComment(self):

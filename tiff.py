@@ -86,8 +86,9 @@ class Tiff(metainfofile.MetaInfoFile):
       out_fp.write("\x49\x49")
     out_fp.write(byteform.itob(42, 2, big_endian = self.is_be))
     out_fp.write(byteform.itob(8, 4, big_endian = self.is_be))
+    
     exif_ifd_offset = self.ifds["tiff"].getSize() + 8
-    gps_ifd_offset = exif_ifd_offset + self.ifds["exif"].getSize()
+    gps_ifd_offset  = exif_ifd_offset + self.ifds["exif"].getSize()
 
     self.ifds["tiff"].setTagPayload("Exif IFD Pointer", exif_ifd_offset)
     self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", gps_ifd_offset)
