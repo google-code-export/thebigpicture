@@ -38,7 +38,7 @@ class MetaInfoFile:
     return payload
 
   def getExifData(self):
-    """ Return the encoded Tiff, Exif and GPS IFD's as a block """
+    """ Return the encoded Tiff, Exif and GPS IFD's as a block. """
     
     # The exif data can have a different endianness than the JPEG file
     ifd_is_be = self.ifds["tiff"].is_be
