@@ -222,8 +222,10 @@ class JPEG(metainfofile.MetaInfoFile):
     # APP13 (Photoshop data) (0xED)
     if (not self.iptc_info):
       for seg in self.segments[SEG_NUMS["APP13"]]:
-        if (seg.getContent(24) == "Photoshop 3.0\x008BIM\x04\x04\x00\x00\x00\x00"): # FIXME: I don't understand these Photosop 8BIM structures, if only IPTC info is present in APP13, the header looks like this.
-          self.iptc_info = iptc.IPTC(self.fp, seg.offset + 30, seg.getContentLength())
+        if (seg.getContent(14) == "Photoshop 3.0\x00"):
+          ps = metainfofile.Photoshop(self.fp, self.fp.tell(), seg.getContentLength())
+          if (1028 in ps.tags):
+            self.iptc_info = iptc.IPTC(self.fp, ps.offset + ps.tags[1028][0], ps.tags[1028][1])
   
   def writeFile(self, file_path):
     # Open the new file for writing
@@ -242,7 +244,7 @@ class JPEG(metainfofile.MetaInfoFile):
       byte_str += "\x49\x49"
     byte_str += byteform.itob(42, 2, big_endian = ifd_is_be)
     byte_str += byteform.itob(8, 4, big_endian = ifd_is_be)
-    byte_str += self.getExifData()
+    byte_str += self.getExifBlock()
     
     # Put the Exif data into an appropriate APP1 segment.  FIXME: This
     # invalidates that segment for feature data extraction.
