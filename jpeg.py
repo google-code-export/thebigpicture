@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import exif, tiff, metainfofile, iptc, byteform
+import exif, tiff, metainfofile, iptc, byteform, tag
 
 import types
 
@@ -63,10 +63,10 @@ SEG_NUMS = {
   "EOI":   0xD9
 }
 
-class Segment:
+class Segment(tag.Tag):
   """ A class for managing JPEG segments. """
   
-  def __init__(self, number, *args):
+  def __init__(self, *args, **kwargs):
     """ The segment can be initialized in two forms:
         - With a file pointer and offset in this file to the start of the
           segment (the 0xFF0xXX part).
@@ -74,65 +74,69 @@ class Segment:
         Furthermore, it needs to know it's one-byte number that specifies the
         segment type. """
     
-    self.number = number
-    
-    # Test for either of two initialization forms
-    if (len(args) == 2):
-      # We have a position in the file
-      self.fp, self.offset = args
-      self.content = None
-    elif (len(args) == 1):
-      # We have  a user set value
-      self.setContent(args[0])
-    else:
-      raise "Initialize a segment either with a byte stream or with a file pointer and offset!"
+    if ("big_endian" in kwargs): big_endian = kwargs["big_endian"]
+    else: big_endian = True
       
-  def setContent(self, content):
-    """ Set the content of the segment. """
-    
-    self.content = content
-    
-    # Invalidate the file stuff 
-    self.fp      = None
-    self.offset  = None
-    
-  def getContentLength(self):
-    """ Return the length of the data in the segment. """
-    
-    # If we have user content, return that length
-    if (self.content):
-      return len(self.content)
+    if (len(args) not in [1, 2]):
+      raise "Segment class wasn't initialized properly!"
       
-    # Otherwise, read it from the segment
-    else:
-      self.fp.seek(self.offset + 2)
-      return byteform.btoi(self.fp.read(2)) - 2
-      
-  def getContent(self, length = None):
-    """ Return the content of the segment. """
-
-    # Find out the length we should read
-    seg_length = self.getContentLength()
-    if (length):
-      if (length > seg_length):
-        length = seg_length
-    else:
-      length = seg_length
+    if (type(args[0]) == types.IntType):
+      # Initialized with tag num
+      self.number = args[0]
+      new_seg = True
+    elif (type(args[0]) == types.StringType):
+      # Initialized with data string
+      new_seg = False
+      on_disk = False
+      blob = args[0]
+      data = blob[:4]
+    elif (type(args[0]) == types.FileType):
+      # Initialized with file pointer
+      new_seg = False
+      on_disk = True
+      if (len(args) == 2):
+        fp, offset = args
+        fp.seek(offset)
+        data = fp.read(4)
+      else:
+        raise "Segment class wasn't initialized properly!"
     
-    # If we have user set content, return that
-    if (self.content):
-      return self.content[:length]
-    # Otherwise, read the content from disk
+    # If we're a new segment, we can be called with a data block
+    if (new_seg):
+      if (len(args) == 2):
+        tag.Tag.__init__(self, args[1], big_endian = big_endian)
+      else:
+        tag.Tag.__init__(self, big_endian = big_endian)
     else:
-      self.fp.seek(self.offset + 4)
-      return self.fp.read(length)
+      # Parse the data
+      # The first byte of a JPEG segment header should be 0xFF
+      if (data[0] != "\xFF"):
+        raise "Not a JPEG segment!"
+        
+      # The next byte determines the type number of the segment      
+      self.number = byteform.btoi(data[1], big_endian = big_endian)
+      
+      # The next two bytes determine the length of the segment. We subtract two
+      # because it includes these two bytes.
+      length = byteform.btoi(data[2:4], big_endian = big_endian) - 2
+      
+      # Call the Tag constructor
+      if (on_disk):
+        tag.Tag.__init__(self, fp, offset + 4, length, big_endian = big_endian)
+      else:
+        if (len(blob) < length):
+          raise "Supplied data is too small!"
+        tag.Tag.__init__(self, blob[4:], big_endian = big_endian)
+    
+  def getNumber(self):
+    return self.number
     
   def getSegment(self):
     """ Return the complete segment, including headers. """
     
     byte_str = "\xff" + chr(self.number)
-    content = self.getContent()
-    byte_str += byteform.itob(len(content) + 2, 2)
+    byte_str += byteform.itob(self.getDataLength() + 2, 2, big_endian = self.is_be)
+    content = self.getData()
     byte_str += content
       
     return byte_str
@@ -183,18 +187,9 @@ class JPEG(metainfofile.MetaInfoFile):
       is_jpeg = False
 
     # Read the file
-    while (data != "") and (is_jpeg):
-      data = self.fp.read(2)
-      
-      # Each segment (SOI, APP1, APP2, EOI, etc) in a JPEG file starts with the
-      # byte FF, with the following byte specifying which field it is.
-      if (data[0] != "\xff"):
-        raise "File is not JPEG"
-        
-      part_type = byteform.btoi(data[1], big_endian = self.is_be)
-      # Create a new segment, with the current file offset, -2 to incluse
-      # the segment header
-      segment = Segment(part_type, self.fp, self.fp.tell() - 2)
+    while (data != ""):
+      segment = Segment(self.fp, self.fp.tell())
+      part_type = segment.getNumber()
       self.segments[part_type].append(segment)
       
       # At the Scan Header, the segment structure stops, and so should we 
@@ -205,15 +200,16 @@ class JPEG(metainfofile.MetaInfoFile):
       # WARNING: the value needs to be absolute, because the Segment class does
       # some file seeking too! The 2 is for the 2 bytes specifying the segment
       # length.
-      else:          
-        self.fp.seek(segment.offset + segment.getContentLength() + 4) 
+      else:
+        segment.getDataOffset() + segment.getDataLength()
+        self.fp.seek(segment.getDataOffset() + segment.getDataLength()) 
     
     # Try to find the Exif data. It should be in one off the APP1 segments,
     # marked by "Exif\x00\x00"
     for seg in self.segments[SEG_NUMS["APP1"]]:
-      if (seg.getContent(6) == "Exif\x00\x00"):
+      if (seg.read(6, 0) == "Exif\x00\x00"):
         self.exif_segment = seg
-        tiff_block = tiff.Tiff(self.fp, seg.offset + 10) # 4 bytes segment header + Exif marker
+        tiff_block = tiff.Tiff(self.fp, seg.getDataOffset() + 6) # 6 bytes Exif marker
         self.ifds = tiff_block.ifds
         self.iptc_info = tiff_block.iptc_info
         break
@@ -222,10 +218,10 @@ class JPEG(metainfofile.MetaInfoFile):
     # APP13 (Photoshop data) (0xED)
     if (not self.iptc_info):
       for seg in self.segments[SEG_NUMS["APP13"]]:
-        if (seg.getContent(14) == "Photoshop 3.0\x00"):
-          ps = metainfofile.Photoshop(self.fp, self.fp.tell(), seg.getContentLength())
+        if (seg.read(14, 0) == "Photoshop 3.0\x00"):
+          ps = metainfofile.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
           if (1028 in ps.tags):
-            self.iptc_info = iptc.IPTC(self.fp, ps.offset + ps.tags[1028][0], ps.tags[1028][1])
+            self.iptc_info = iptc.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
   
   def writeFile(self, file_path):
     # Open the new file for writing
@@ -252,7 +248,7 @@ class JPEG(metainfofile.MetaInfoFile):
     #  self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
     #  self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
     #else:
-    self.exif_segment.setContent(byte_str)
+    self.exif_segment.setData(byte_str)
     
     # Iterate over all segments and copy them from the original file or rewrite
     # them.
@@ -265,7 +261,7 @@ class JPEG(metainfofile.MetaInfoFile):
         
     # Write the image data, which starts after the SOS segment
     segment = self.segments[SEG_NUMS["SOS"]][-1]
-    self.fp.seek(segment.offset + segment.getContentLength() + 2)
+    self.fp.seek(segment.data_offset + segment.getDataLength() + 2)
     out_fp.write(self.fp.read())
     
     out_fp.close()
@@ -277,7 +273,7 @@ class JPEG(metainfofile.MetaInfoFile):
     # Loop over the comment segments 
     comments = []
     for com_seg in self.segments[SEG_NUMS["COM"]]:
-      comments.append(com_seg.getContent())
+      comments.append(com_seg.getData())
 
     # Return None if no comment was found, or a list with comments otherwise      
     if (len(comments) == 0):

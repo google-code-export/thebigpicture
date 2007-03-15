@@ -17,9 +17,9 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import byteform
+import byteform, tag
 
-class Photoshop:
+class Photoshop(tag.Tag):
   """ Read and write the photoshop structure. """
   
   def __init__(self, *args, **kwargs):
@@ -28,24 +28,11 @@ class Photoshop:
         binary content as string. An optional big_endian argument may be given
         to determine the byte ordering (defaults to big endian). """
         
-    if (len(args) == 3):
-      self.fp, self.offset, self.length = args
-      self.content = None
-    else:
-      self.fp, self.offset = None
-      self.content = args[0]
-      self.length = len(self.content)
+    # Call the Tag constructor
+    tag.Tag.__init__(self, *args, **kwargs)
     
-    if ("big_endian" in kwargs):
-      self.is_be = kwargs["big_endian"]
-    else:
-      self.is_be = True
-    
+    # Parse the structure
     self.tags = {}
-    
-    # Needed for reading from file or string
-    self.byte_pos = 0
-    
     self.parse()
     
   def parse(self):
@@ -54,52 +41,39 @@ class Photoshop:
     while (self.byte_pos < self.length):
       # The first four bytes of a data structure should always be the ASCII
       # string 8BIM
-      data = self.__readBytes__(4)
+      data = self.read(4)
       if (data != "8BIM"):
         break
 
       # The next two bytes specify the resource ID (tag number)
-      tag_num = byteform.btoi(self.__readBytes__(2), big_endian = self.is_be)
+      tag_num = byteform.btoi(self.read(2), big_endian = self.is_be)
         
       # What then follows is the "Pascal string". The first byte determines its
       # length. If the total is an uneven number, it is padded with a \x00
       # character. We don't need this string, so we step over it. 
-      ps_len =  byteform.btoi(self.__readBytes__(1), big_endian = self.is_be)
+      ps_len =  byteform.btoi(self.read(1), big_endian = self.is_be)
       if ((ps_len % 2) == 0):
         ps_len += 1
-      self.__readBytes__(ps_len)
+      self.read(ps_len)
         
       # Now it's getting interesting; the next four bytes determine the length
       # of the data
-      data_len = byteform.btoi(self.__readBytes__(4), big_endian = self.is_be)
+      data_len = byteform.btoi(self.read(4), big_endian = self.is_be)
        
       # Store the byte position and data length in the tags dict
-      self.tags[tag_num] = [self.byte_pos, data_len]
-        
-  def __readBytes__(self, num_bytes):
-    """ Read a number of bytes from either the content or the file, and return
-        them. """
+      self.tags[tag_num] = tag.Tag(self.fp, self.byte_pos, data_len)
+
+  def getDataBlock(self):
+    """ Return the Photoshop structure as a binary data block. """
     
-    data = None
-    
-    if ((self.byte_pos + num_bytes) > self.length):
-      raise "Attempt to read beyond the size of the data block!"
-      
-    if (self.fp) and (self.offset):
-      self.fp.seek(self.offset + self.byte_pos)
-      data = self.fp.read(num_bytes)
-    elif (self.content):
-      data = self.content[byte_pos:byte_pos + num_bytes]
-      
-    self.byte_pos += num_bytes
-    
-    return data
+    pass
         
 class MetaInfoFile:
   """The base class for files containing meta information."""
   
   def __init__(self):
     self.ifds = dict.fromkeys(["tiff", "exif", "gps"], None)
+    self.iptc_info = None
 
   def getExifTagPayload(self, tag):
     """ Return the payload of a tag with the specified name. """
