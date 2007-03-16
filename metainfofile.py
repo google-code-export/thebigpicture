@@ -27,9 +27,18 @@ class Photoshop(tag.Tag):
         offset to the start of the structure, and length, or by passing the
         binary content as string. An optional big_endian argument may be given
         to determine the byte ordering (defaults to big endian). """
-        
+      
+    # Find out in which form we were called and set the parameters ccorrect for
+    # the Tag constructor
+    if (len(args) == 1):
+      kwargs[data] = args[0]
+    elif (len(args) == 3):
+      kwargs["fp"]     = args[0]
+      kwargs["offset"] = args[1]
+      kwargs["length"] = args[2]
+      
     # Call the Tag constructor
-    tag.Tag.__init__(self, *args, **kwargs)
+    tag.Tag.__init__(self, **kwargs)
     
     # Parse the structure
     self.tags = {}

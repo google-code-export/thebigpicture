@@ -3,47 +3,49 @@ class Tag:
       It can either save a file pointer, offset and length, or actual binary
       data. """
       
-  def __init__(self, *args, **kwargs):
+  def __init__(self, fp = None, offset = None, length = None, data = None, big_endian = True):
     """ A tag may be initialized with binary data, or a list of file pointer,
         offset and length in bytes, or a list of only file pointer and offset,
         but then the derived class should set the length parameter. """
 
-    # Check in which form we were called
-    if (len(args) == 0):
-      self.fp          = None
-      self.data_offset = None
-      self.length      = None
-      self.data        = None
-    if (len(args) == 3):
-      self.fp, self.data_offset, self.length = args
-      self.data = None
-    elif (len(args) == 1):
-      self.fp          = None
-      self.data_offset = None
-      self.length      = None
-      self.data        = args[0]
-    else:
-      raise "Initialize either with a file pointer, offset and length, or with a binary data string."
+    self.is_be = big_endian 
+
+    # Do some calling checks
+    proper_call = True
+    if (fp or offset or length):
+      if (data):
+        proper_call = False
+      if not (fp and offset and length):
+        proper_call = False
+    if not (proper_call):
+      raise "Either initialize a Tag with file pointer, byte offset and length, or with a data block!"
       
-    # Check if the user set a big_endian keyword argument
-    if ("big_endian" in kwargs):
-      self.is_be = kwargs["big_endian"]
-    else:
-      self.is_be = True
-  
+    # Check in which form we were called
+    self.fp          = None
+    self.data_offset = None
+    self.length      = None
+    self.data        = None
+    
+    if (fp):
+      self.fp          = fp
+      self.data_offset = offset
+      self.length      = length
+    elif (data):
+      self.setData(data)
+    
     # Needed for reading from file or string
     self.byte_pos = 0
 
   def setData(self, data):
     """ Set the data of the tag to the specified binary string. """
-    
+
     self.data        = data
     self.fp          = None
     self.data_offset = None
     self.length      = None
     
   def getDataLength(self):
-    """ Return the length of the data. """
+    """ Return the length of the data, or None if the Tag object is empty. """
     
     if (self.data):
       return len(self.data)

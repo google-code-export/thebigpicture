@@ -74,59 +74,61 @@ class Segment(tag.Tag):
         Furthermore, it needs to know it's one-byte number that specifies the
         segment type. """
     
-    if ("big_endian" in kwargs): big_endian = kwargs["big_endian"]
-    else: big_endian = True
+    if ("big_endian" in kwargs): self.big_endian = kwargs["big_endian"]
+    else: self.big_endian = True
       
+    # There are four different ways in which this class can be initialized, but
+    # it should always be with one or two arguments
     if (len(args) not in [1, 2]):
       raise "Segment class wasn't initialized properly!"
       
+    # We construct a separate dics for the Tag arguments
+    tag_kwargs = {}
+    
+    # Check the different initialization types
     if (type(args[0]) == types.IntType):
       # Initialized with tag num
       self.number = args[0]
-      new_seg = True
+      if (len(args) == 2):
+        tag_kwargs["data"] = args[1]
+        
     elif (type(args[0]) == types.StringType):
       # Initialized with data string
-      new_seg = False
-      on_disk = False
-      blob = args[0]
-      data = blob[:4]
+      self.number, length = self.__parseHeader__(args[0][:4])
+      tag_kwargs["data"] = args[0][4:length + 4] # Skip first four bytes of segment header
+      
     elif (type(args[0]) == types.FileType):
       # Initialized with file pointer
-      new_seg = False
-      on_disk = True
-      if (len(args) == 2):
-        fp, offset = args
-        fp.seek(offset)
-        data = fp.read(4)
-      else:
-        raise "Segment class wasn't initialized properly!"
+      
+      # Parse the header
+      fp, offset = args[0:2]
+      fp.seek(offset)
+      self.number, length = self.__parseHeader__(fp.read(4))
+      
+      # Construct the data for tag init
+      tag_kwargs["fp"]     = fp
+      tag_kwargs["offset"] = offset + 4 # Data starts four bytes after segment
+      tag_kwargs["length"] = length
     
-    # If we're a new segment, we can be called with a data block
-    if (new_seg):
-      if (len(args) == 2):
-        tag.Tag.__init__(self, args[1], big_endian = big_endian)
-      else:
-        tag.Tag.__init__(self, big_endian = big_endian)
-    else:
-      # Parse the data
-      # The first byte of a JPEG segment header should be 0xFF
-      if (data[0] != "\xFF"):
-        raise "Not a JPEG segment!"
-        
-      # The next byte determines the type number of the segment      
-      self.number = byteform.btoi(data[1], big_endian = big_endian)
+    # Call the Tag constructor
+    tag.Tag.__init__(self, **tag_kwargs)
+    
+  def __parseHeader__(self, header):
+    """ Parse the first bytes of the segment header, and return a list of number
+        and length. """
+
+    # The first byte of a JPEG segment header should be 0xFF
+    if (header[0] != "\xFF"):
+      raise "Not a JPEG segment!"
       
-      # The next two bytes determine the length of the segment. We subtract two
-      # because it includes these two bytes.
-      length = byteform.btoi(data[2:4], big_endian = big_endian) - 2
-      
-      # Call the Tag constructor
-      if (on_disk):
-        tag.Tag.__init__(self, fp, offset + 4, length, big_endian = big_endian)
-      else:
-        if (len(blob) < length):
-          raise "Supplied data is too small!"
-        tag.Tag.__init__(self, blob[4:], big_endian = big_endian)
+    # The next byte determines the type number of the segment      
+    number = byteform.btoi(header[1], big_endian = self.big_endian)
+    
+    # The next two bytes determine the length of the segment. We subtract two
+    # because it includes these two bytes.
+    length = byteform.btoi(header[2:4], big_endian = self.big_endian) - 2
+    
+    return [number, length]
     
   def getNumber(self):
     return self.number
