@@ -84,9 +84,9 @@ class Tiff(metainfofile.MetaInfoFile):
     # Get the IPTC block. The payload isn't the position in the file, but
     # rather the IPTC content. To let the IPTC class do its job, we feed it
     # the position of the block.
-    if (33723 in self.ifds["tiff"].disk_fields):
-      iptc_offset = self.ifds["tiff"].disk_fields[33723][0]
-      iptc_length = self.ifds["tiff"].disk_fields[33723][2]
+    if (33723 in self.ifds["tiff"].fields):
+      iptc_offset = self.ifds["tiff"].fields[33723][0]
+      iptc_length = self.ifds["tiff"].fields[33723][2]
       self.iptc_info = iptc.IPTC(self.fp, iptc_offset, iptc_length) 
     else:
       self.iptc_info = None

@@ -3,12 +3,10 @@ class Tag:
       It can either save a file pointer, offset and length, or actual binary
       data. """
       
-  def __init__(self, fp = None, offset = None, length = None, data = None, big_endian = True):
+  def __init__(self, fp = None, offset = None, length = None, data = None):
     """ A tag may be initialized with binary data, or a list of file pointer,
         offset and length in bytes, or a list of only file pointer and offset,
         but then the derived class should set the length parameter. """
-
-    self.is_be = big_endian 
 
     # Do some calling checks
     proper_call = True

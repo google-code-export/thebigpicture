@@ -28,17 +28,22 @@ class Photoshop(tag.Tag):
         binary content as string. An optional big_endian argument may be given
         to determine the byte ordering (defaults to big endian). """
       
-    # Find out in which form we were called and set the parameters ccorrect for
+    # Check for the endiannnes parameter
+    if ("big_endian" in kwargs): self.big_endian = kwargs["big_endian"]
+    else: self.big_endian = True
+    
+    # Find out in which form we were called and set the parameters correct for
     # the Tag constructor
+    base_kwargs
     if (len(args) == 1):
-      kwargs[data] = args[0]
+      base_kwargs[data] = args[0]
     elif (len(args) == 3):
-      kwargs["fp"]     = args[0]
-      kwargs["offset"] = args[1]
-      kwargs["length"] = args[2]
+      base_kwargs["fp"]     = args[0]
+      base_kwargs["offset"] = args[1]
+      base_kwargs["length"] = args[2]
       
     # Call the Tag constructor
-    tag.Tag.__init__(self, **kwargs)
+    tag.Tag.__init__(self, **base_kwargs)
     
     # Parse the structure
     self.tags = {}

@@ -70,9 +70,8 @@ class Segment(tag.Tag):
     """ The segment can be initialized in two forms:
         - With a file pointer and offset in this file to the start of the
           segment (the 0xFF0xXX part).
-        - With a byte stream
-        Furthermore, it needs to know it's one-byte number that specifies the
-        segment type. """
+        - With a byte stream 
+    """
     
     if ("big_endian" in kwargs): self.big_endian = kwargs["big_endian"]
     else: self.big_endian = True

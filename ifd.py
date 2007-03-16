@@ -17,13 +17,44 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import types, byteform, ifddatatypes
+import types, byteform, ifddatatypes, tag
 
+class Tag(tag.Tag):
+  """ An IFD tag. """
+      
+  def __init__(self, *args):
+    """ Initialize either with file pointer, offset, length, and data type, or
+        the encoded content and data type. """
+      
+    # Construct a dict for the base class
+    base_kwargs = {}
+    
+    # Check if we were called with data or with file pointer
+    if (len(args) == 2):
+      base_kwargs["data"] = args[0]
+    elif (len(args) == 4):
+      base_kwargs["fp"]     = args[0]
+      base_kwargs["offset"] = args[1]
+      base_kwargs["length"] = args[2]
+    else:
+      raise "Wrong initialization of Exif tag!"
+      
+    # The data type is always the last argument
+    self.data_type = args[-1]
+      
+    # Initialize the base class. The endianness does not even matter, it is
+    # never used.
+    tag.Tag.__init__(self, **base_kwargs)
+    
+  def getDataType(self):
+    """ Return the data type of the tag. """
+    return self.data_type
+      
 class IFD:
   """An IFD (Image File Directory) represents an elementary data type in both a
   Tiff and an Exif file. It has a certain ifd_offset in the file. A
   header_offset may also be specified to determine the start of the enclosing,
-  larger part (APP0 for example). Offsets in an IFD are measured from this
+  larger part (APP1 for example). Offsets in an IFD are measured from this
   number. This class functions as a base class. Derived classes need to specify
   the arrays tag_names, tag_nums and required_tags. The first is an array with
   the string representation of the names of the tags, the second one holds the
@@ -35,20 +66,13 @@ class IFD:
     self.header_offset = header_offset
     self.ifd_offset    = ifd_offset + self.header_offset
     self.is_be         = is_be
-        
-    # This dict stores the relevant locations for each field in the IDF. The
-    # key is the field type (number), and the data is a list of 
-    # [offset, data type, number of bytes]
-    self.disk_fields = {}
+
+    # The fields dict stores all the tags read from disk and/or set by the user.
     self.mapDiskFields()
     
-    # The relevant fields (tags, whatever you want to call it) are stored in the
-    # dict self.user_fields. The key is the field type (number), and the value
-    # is a list of [data_type, encoded data]
-    self.user_fields = {}
-
   def mapDiskFields(self):
-    self.disk_fields = {} # The map
+    """ Reads the exif structure from disk and maps all the fields. """
+    self.fields = {} # Empty the map
     
     # Go to the proper offset and read the first two bytes. They represent the
     # number of fields in the IFD
@@ -74,28 +98,26 @@ class IFD:
         self.fp.read(4)
       else:
         payload_offset = byteform.btoi(self.fp.read(4), big_endian = self.is_be)
-        
-      self.disk_fields[tag_type] = [payload_offset, data_type, num_bytes]
+
+      # Store the tag
+      self.fields[tag_type] = Tag(self.fp, payload_offset + self.header_offset, num_bytes, data_type)
 
   def getTagPayload(self, tag):
     """Returns the payload from a certain tag name or number."""
     
     # Get the tag number
-    tag_num = self.__getTagNum(tag)
+    tag_num = self.__getTagNum__(tag)
 
-    if (tag_num) and (tag_num in self.user_fields):
-      # If the tag is specifically set, return its value
-      data_type, data = self.user_fields[tag_num]
-    elif (tag_num) and (tag_num in self.disk_fields):
-      # Seek to the correct location and read the data
-      offset, data_type, length = self.disk_fields[tag_num]
-      self.fp.seek(offset + self.header_offset)
-      data = self.fp.read(length)
+    if ((tag_num) and (tag_num in self.fields)):
+      tag = self.fields[tag_num]
     else:
       # If the tag was not found, return False
       return False
-      
-    payload = ifddatatypes.TYPES[data_type].decode(data, self.is_be)
+
+    # Decipher the relevant info
+    data_type = tag.getDataType()
+    data      = tag.getData()
+    payload   = ifddatatypes.TYPES[data_type].decode(data, self.is_be)
 
     # If the data is a single value, return it as such, otherwise, return a
     # list
@@ -108,12 +130,12 @@ class IFD:
     """Sets the payload for a certain tag num or tag name."""
     
     # Get the tag num for the tag
-    tag_num = self.__getTagNum(tag)
+    tag_num = self.__getTagNum__(tag)
     
     if (tag_num):
       index = self.tag_nums.index(tag_num)
 
-      # Make sure the payload is a sequence      
+      # Make sure the payload is in a sequence      
       if (type(payload) not in [types.ListType, types.TupleType]):
         payload = [payload]
         
@@ -141,24 +163,19 @@ class IFD:
           break
         
       # Set the used data type and payload
-      self.user_fields[tag_num] = [data_type, data]
+      self.fields[tag_num] = Tag(data, data_type)
 
   def getTagNums(self):
     """ Return a sorted list of set tag nums in this IFD. """
     
-    # Get all the unique tags using a set
-    tag_nums = set(self.disk_fields) | set(self.user_fields)
-    
-    # Sort them
-    tag_nums = list(tag_nums)
+    tag_nums = self.fields.keys()
     tag_nums.sort()
-    
     return tag_nums
     
   def getSize(self):
     """ Calculate the byte size of the IFD. """
     
-    tag_nums = self.getTagNums()
+    tag_nums = self.fields.keys()
     
     # An IFD always needs 2 bytes at the start to specify the number of fields,
     # and 4 bytes between the fields and the data for the byte offset to the
@@ -171,11 +188,8 @@ class IFD:
     # For each field with a data block larger than four bytes, we need to add
     # the size of the data field
     for tag_num in tag_nums:
-      if (tag_num in self.user_fields):
-        num_bytes = len(self.user_fields[tag_num][1])
-      else:
-        num_bytes = self.disk_fields[tag_num][2]
-      
+      tag       = self.fields[tag_num]
+      num_bytes = tag.getDataLength()
       if (num_bytes > 4):
         size += num_bytes
     return size
@@ -202,14 +216,10 @@ class IFD:
     
     # Write each tag
     for tag_num in tag_nums:
-      if (tag_num in self.user_fields):
-        data_type, data = self.user_fields[tag_num]
-      else:
-        data_type = self.disk_fields[tag_num][1]
-        self.fp.seek(self.disk_fields[tag_num][0] + self.header_offset)
-        data = self.fp.read(self.disk_fields[tag_num][2])
-        
-      count = len(data) / ifddatatypes.TYPES[data_type].word_width
+      tag       = self.fields[tag_num]
+      data_type = tag.getDataType()
+      data      = tag.getData()
+      count     = len(data) / ifddatatypes.TYPES[data_type].word_width
         
       # Construct the field
       fields_stream += byteform.itob(tag_num, 2, big_endian = self.is_be)
@@ -225,7 +235,7 @@ class IFD:
         
     return fields_stream + data_stream
     
-  def __getTagNum(self, tag):
+  def __getTagNum__(self, tag):
     """ Find out if a tag name or number is known, and return its number or
         False otherwise. """
     
@@ -244,9 +254,4 @@ class IFD:
         pass
   
     return ret
-    
-#  def getDiskSize(self):
-#    """Return the size in bytes of the IDF on disk, including the 2 bytes that
-#    specify the number of fields."""
-#    return 2 + (len(self.disk_fields) * 12)
- 
+
