@@ -151,18 +151,29 @@ class MetaInfoFile:
     else:
       gps_ifd_offset = 0
 
+    if "interop" in self.ifds:
+      interop_ifd_offset  = gps_ifd_offset + self.ifds["gps"].getSize() # FIXME: If no GPS block is present, this will produce the wrong result. This is also the case for other parts
+    else:
+      interop_ifd_offset = 0
+      
     # Set the offsets to the tiff data
     if (exif_ifd_offset):
       self.ifds["tiff"].setTagPayload("Exif IFD Pointer", exif_ifd_offset)
     if (gps_ifd_offset):
       self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", gps_ifd_offset)
-          
+
+    # Set the offsets to the exif data. FIXME: Check for presence of Exif data first
+    if (interop_ifd_offset):
+      self.ifds["exif"].setTagPayload(40965, interop_ifd_offset)
+
     # Write the Exif IFD's
     byte_str = self.ifds["tiff"].getByteStream(8)
     if ("exif" in self.ifds):
       byte_str += self.ifds["exif"].getByteStream(exif_ifd_offset)
     if ("gps" in self.ifds):
       byte_str += self.ifds["gps"].getByteStream(gps_ifd_offset)
+    if ("interop" in self.ifds):
+      byte_str += self.ifds["interop"].getByteStream(interop_ifd_offset)
       
     return byte_str
     

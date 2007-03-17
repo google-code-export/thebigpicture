@@ -17,6 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
+# FIXME: Is this file still used or is everything specidief in exif.py?
 import ifd
 
 class TIFFData(ifd.IFD):

@@ -75,6 +75,10 @@ class Tiff(metainfofile.MetaInfoFile):
     ifd_offsets["exif"] = self.ifds["tiff"].getTagPayload("Exif IFD Pointer")
     if (ifd_offsets["exif"]):
       self.ifds["exif"] = exif.Exif(self.fp, ifd_offsets["exif"], offset, self.big_endian)
+      # Get the Interoperability tags. FIXME: Is this always in the Exif IFD located?
+      ifd_offsets["interop"] = self.ifds["exif"].getTagPayload(40965)
+      if (ifd_offsets["interop"]):
+        self.ifds["interop"] = exif.GPS(self.fp, ifd_offsets["interop"], offset, self.big_endian)
       
     # Get the GPS tags
     ifd_offsets["gps"] = self.ifds["tiff"].getTagPayload("GPSInfo IFD Pointer")
@@ -106,13 +110,16 @@ class Tiff(metainfofile.MetaInfoFile):
     out_fp.write(byteform.itob(42, 2, big_endian = self.big_endian))
     out_fp.write(byteform.itob(8, 4, big_endian = self.big_endian))
     
-    exif_ifd_offset = self.ifds["tiff"].getSize() + 8
-    gps_ifd_offset  = exif_ifd_offset + self.ifds["exif"].getSize()
+    exif_ifd_offset     = self.ifds["tiff"].getSize() + 8
+    gps_ifd_offset      = exif_ifd_offset + self.ifds["exif"].getSize()
+    interop_ifd_offset  = gps_ifd_offset + self.ifds["gps"].getSize()
 
     self.ifds["tiff"].setTagPayload("Exif IFD Pointer", exif_ifd_offset)
     self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", gps_ifd_offset)
+    self.ifds["exif"].setTagPayload(40965, interop_ifd_offset)
     
     out_fp.write(self.ifds["tiff"].getByteStream(8))
     out_fp.write(self.ifds["exif"].getByteStream(exif_ifd_offset))
     out_fp.write(self.ifds["gps"].getByteStream(gps_ifd_offset))
+    out_fp.write(self.ifds["interop"].getByteStream(interop_ifd_offset))
     out_fp.close()

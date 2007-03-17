@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import tag, byteform
+import tag, byteform, types, iptcdatatypes
 
 # The possible IPTC records. This data is taken from the Exiftool documentation
 RECORDS = [1, 2, 3, 7, 8, 9]
@@ -29,6 +29,56 @@ REC_NUMS = {
   "IPTCObjectData":     8,
   "IPTCPostObjectData": 9
 }
+
+class IPTCRecord:
+  """ Base class for retrieving data about tags  in IPTC records. Derived
+      classes should implement the following lists:
+      - names : the names of the tags
+      - nums  : the numbers of the tags
+      - counts: the number of words every tag should occupy, with None
+                    to indicate that this is free
+      - types : the numbers of tag data types of the tags, as found in
+                iptcdatatypes.TYPES
+  """
+  
+  def getTagNum(self, tag):
+    """ Returns a tag number when fed a tag number or name, or None if it
+        doesn't exist within the current record. """
+        
+    ret = False
+    
+    if (type(tag) == types.IntType):
+      # We have a tag number as user input
+      if tag in self.tag_nums:
+        ret = tag
+    elif (type(tag) == types.StringType):
+      # We have a tag name, search the number for it
+      try:
+        index = self.tag_names.index(tag)
+        ret = self.tag_nums[index]
+      except ValueError:
+        pass
+  
+    return ret
+
+  def getDataType(self, tag):
+    """ Return the data type for a certain tag (name or number). """
+    tag_num   = self.getTagNum(tag)
+    data_type = self.data_types(self.tag_nums.index(tag_num))
+    return data_type
+
+  def getCount(self, tag):
+    """ Return the count for a certain tag (name or number), if any, or None
+        if otherwise. """
+    tag_num = self.getTagNum(tag)
+    count   = self.data_types(self.tag_counts.index(tag_num))
+    return count
+
+class IPTCEnvelope(IPTCRecord):
+  names  = ["EnvelopeRecordVersion", "Destination", "FileFormat", "FileVersion", "ServiceIdentifier", "EnvelopeNumber", "ProductID", "EnvelopePriority", "DateSent", "TimeSent", "CodedCharacterSet", "UniqueObjectName", "ARMIdentifier", "ARMVersion"]
+  nums   = [0, 5, 20, 22, 30, 40, 50, 60, 70, 80, 90, 100, 120, 122]
+  counts = [3, 2, 3, 3, 2, 15, 2, 15, 15, 2, 2, 2, 3, 3]
+  types  = [1, 1, 1, 1, [0, 10], 8, [0, 32], 1, 8, 11, [0.32], [14, 80], 1, 1]
 
 class TagList:
   """ Manage lists of IPTC tags within a record. IPTC blocks can hav multiple

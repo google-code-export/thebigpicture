@@ -141,6 +141,7 @@ class IFD:
         
       # Check if the supplied data is of correct length
       req_count = self.data_counts[index]
+
       if (req_count != None) and (req_count != -1):
         if (len(payload) != req_count):
           raise "Wrong number of arguments supplied for encoding this tag!"
