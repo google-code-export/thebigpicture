@@ -13,7 +13,7 @@
 # GNU Lesser General Public License for more details.
 # 
 # You should have received a copy of the GNU Lesser General Public License
-# along with The Big PictureGe; if not, write to the Free Software
+# along with The Big Picture; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
@@ -61,11 +61,11 @@ class IFD:
   numerical values in the same order. The third array holds the number of all
   the required tags. """
   
-  def __init__(self, file_pointer, ifd_offset, header_offset = 0, is_be = True):
+  def __init__(self, file_pointer, ifd_offset, header_offset = 0, big_endian = True):
     self.fp            = file_pointer
     self.header_offset = header_offset
     self.ifd_offset    = ifd_offset + self.header_offset
-    self.is_be         = is_be
+    self.big_endian         = big_endian
 
     # The fields dict stores all the tags read from disk and/or set by the user.
     self.mapDiskFields()
@@ -77,14 +77,14 @@ class IFD:
     # Go to the proper offset and read the first two bytes. They represent the
     # number of fields in the IFD
     self.fp.seek(self.ifd_offset)
-    num_fields = byteform.btoi(self.fp.read(2), big_endian = self.is_be)
+    num_fields = byteform.btoi(self.fp.read(2), big_endian = self.big_endian)
 
     for field_num in range(num_fields):
       # Read the type of the tag (number), the way the payload is stored, and
       # the length of the payload
-      tag_type    = byteform.btoi(self.fp.read(2), big_endian = self.is_be)
-      data_type   = byteform.btoi(self.fp.read(2), big_endian = self.is_be)
-      payload_len = byteform.btoi(self.fp.read(4), big_endian = self.is_be)
+      tag_type    = byteform.btoi(self.fp.read(2), big_endian = self.big_endian)
+      data_type   = byteform.btoi(self.fp.read(2), big_endian = self.big_endian)
+      payload_len = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
 
       # The word width (number of bytes to encode one "character") of the
       # payload is determined by the data type. This needs to be multiplied by
@@ -97,7 +97,7 @@ class IFD:
         payload_offset = self.fp.tell() - self.header_offset
         self.fp.read(4)
       else:
-        payload_offset = byteform.btoi(self.fp.read(4), big_endian = self.is_be)
+        payload_offset = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
 
       # Store the tag
       self.fields[tag_type] = Tag(self.fp, payload_offset + self.header_offset, num_bytes, data_type)
@@ -117,7 +117,7 @@ class IFD:
     # Decipher the relevant info
     data_type = tag.getDataType()
     data      = tag.getData()
-    payload   = ifddatatypes.TYPES[data_type].decode(data, self.is_be)
+    payload   = ifddatatypes.TYPES[data_type].decode(data, self.big_endian)
 
     # If the data is a single value, return it as such, otherwise, return a
     # list
@@ -155,7 +155,7 @@ class IFD:
       success = False
       for data_type in data_types:
         try:
-          data = ifddatatypes.TYPES[data_type].encode(payload, self.is_be)
+          data = ifddatatypes.TYPES[data_type].encode(payload, self.big_endian)
           success = True
         except:
           pass
@@ -211,8 +211,8 @@ class IFD:
     # 12-byte fields specifying tags, data type, etc. and the other one contains
     # the encoded data (which is over 4 bytes in size). At the end, these two
     # fields will be concatenated
-    fields_stream = byteform.itob(len(tag_nums), 2, big_endian = self.is_be)
-    data_stream   = byteform.itob(next_ifd, 4, big_endian = self.is_be)
+    fields_stream = byteform.itob(len(tag_nums), 2, big_endian = self.big_endian)
+    data_stream   = byteform.itob(next_ifd, 4, big_endian = self.big_endian)
     
     # Write each tag
     for tag_num in tag_nums:
@@ -222,14 +222,14 @@ class IFD:
       count     = len(data) / ifddatatypes.TYPES[data_type].word_width
         
       # Construct the field
-      fields_stream += byteform.itob(tag_num, 2, big_endian = self.is_be)
-      fields_stream += byteform.itob(data_type, 2, big_endian = self.is_be)
-      fields_stream += byteform.itob(count, 4, big_endian = self.is_be)
+      fields_stream += byteform.itob(tag_num, 2, big_endian = self.big_endian)
+      fields_stream += byteform.itob(data_type, 2, big_endian = self.big_endian)
+      fields_stream += byteform.itob(count, 4, big_endian = self.big_endian)
       if (len(data) <= 4):
         fields_stream += data
         fields_stream += (4 - len(data)) * "\x00"
       else:
-        fields_stream += byteform.itob(data_offset, 4, big_endian = self.is_be)
+        fields_stream += byteform.itob(data_offset, 4, big_endian = self.big_endian)
         data_stream   += data
         data_offset   += len(data)
         

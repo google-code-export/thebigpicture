@@ -58,9 +58,9 @@ class Tag:
     data = None
 
     # Seek to the specified position
-    if (seek):
+    if (seek != None): # Explicit test, because 0 is a valid value 
       self.seek(seek)
-      
+  
     # Find out the number of bytes we should read
     if not (num_bytes):
       num_bytes = self.getDataLength() - self.byte_pos
@@ -83,6 +83,7 @@ class Tag:
     
   def seek(self, position):
     """ Sets the byte position to the specified position. """
+
     if (position > self.getDataLength()):
       raise "Trying to seek outside data block."
     else:
@@ -90,11 +91,15 @@ class Tag:
     
   def getData(self):
     """ Return the data blob. """
-    self.seek(0)
-    return self.read()
+    return self.read(seek = 0)
     
   def getDataOffset(self):
     """ Return the offset in the file where the data can be found, or None
-        if the data is useer set. """
+        if the data is user set. """
         
     return self.data_offset
+    
+  def tell(self):
+    """ Return the current offset in the file or data stream. """
+    
+    return self.byte_pos

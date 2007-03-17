@@ -13,7 +13,7 @@
 # GNU Lesser General Public License for more details.
 # 
 # You should have received a copy of the GNU Lesser General Public License
-# along with The Big PictureGe; if not, write to the Free Software
+# along with The Big Picture; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
@@ -34,7 +34,7 @@ class Photoshop(tag.Tag):
     
     # Find out in which form we were called and set the parameters correct for
     # the Tag constructor
-    base_kwargs
+    base_kwargs = {}
     if (len(args) == 1):
       base_kwargs[data] = args[0]
     elif (len(args) == 3):
@@ -60,27 +60,58 @@ class Photoshop(tag.Tag):
         break
 
       # The next two bytes specify the resource ID (tag number)
-      tag_num = byteform.btoi(self.read(2), big_endian = self.is_be)
+      tag_num = byteform.btoi(self.read(2), big_endian = self.big_endian)
         
       # What then follows is the "Pascal string". The first byte determines its
       # length. If the total is an uneven number, it is padded with a \x00
       # character. We don't need this string, so we step over it. 
-      ps_len =  byteform.btoi(self.read(1), big_endian = self.is_be)
+      ps_len =  byteform.btoi(self.read(1), big_endian = self.big_endian)
       if ((ps_len % 2) == 0):
         ps_len += 1
       self.read(ps_len)
         
       # Now it's getting interesting; the next four bytes determine the length
       # of the data
-      data_len = byteform.btoi(self.read(4), big_endian = self.is_be)
+      data_len = byteform.btoi(self.read(4), big_endian = self.big_endian)
        
       # Store the byte position and data length in the tags dict
       self.tags[tag_num] = tag.Tag(self.fp, self.byte_pos, data_len)
+      
+      # Skip to the next structure
+      self.read(data_len)
 
+
+  def setTag(self, tag_num, data):
+    """ Set the tag_num to data. """
+    
+    self.tags[tag_num] = tag.Tag(data = data)
+    
   def getDataBlock(self):
     """ Return the Photoshop structure as a binary data block. """
+
+    # Store the buffer as string    
+    out_str = ""
     
-    pass
+    # Iterate over all tags
+    for tag_num in self.tags:
+      tag = self.tags[tag_num]
+      
+      # Every data structure starts with "8BIM"
+      out_str += "8BIM"
+      
+      # The next two bytes specify the resource ID (tag number)
+      out_str += byteform.itob(tag_num, 2, big_endian = self.big_endian)
+        
+      # Then we get the Pascal string, which we simply set to nothing
+      out_str += "\x00\x00"
+           
+      # Encode the length of the data
+      out_str += byteform.itob(tag.getDataLength(), 4, big_endian = self.big_endian)
+       
+      # And append the data itself
+      out_str += tag.getData()
+      
+    return out_str
         
 class MetaInfoFile:
   """The base class for files containing meta information."""
@@ -107,7 +138,7 @@ class MetaInfoFile:
     """ Return the encoded Tiff, Exif and GPS IFD's as a block. """
     
     # The exif data can have a different endianness than the JPEG file
-    ifd_is_be = self.ifds["tiff"].is_be
+    ifd_big_endian = self.ifds["tiff"].big_endian
           
     # Calculate the different byte offsets (within the segment)
     if "exif" in self.ifds:

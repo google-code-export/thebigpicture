@@ -13,7 +13,7 @@
 # GNU Lesser General Public License for more details.
 # 
 # You should have received a copy of the GNU Lesser General Public License
-# along with The Big PictureGe; if not, write to the Free Software
+# along with The Big Picture; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
@@ -136,7 +136,7 @@ class Segment(tag.Tag):
     """ Return the complete segment, including headers. """
     
     byte_str = "\xff" + chr(self.number)
-    byte_str += byteform.itob(self.getDataLength() + 2, 2, big_endian = self.is_be)
+    byte_str += byteform.itob(self.getDataLength() + 2, 2, big_endian = self.big_endian)
     content = self.getData()
     byte_str += content
       
@@ -146,7 +146,7 @@ class JPEG(metainfofile.MetaInfoFile):
   """Parse and write JPEG files."""
 
   # JPEG files are always big endian
-  is_be = True
+  big_endian = True
     
   def __init__(self, file_indicator, offset = 0):
     """Initialize a JPEG file object. It needs an open file object or a path to
@@ -175,6 +175,7 @@ class JPEG(metainfofile.MetaInfoFile):
     # Also remember the segments were we found the Exif and IPTC data
     self.exif_segment = None
     self.iptc_segment = None
+    self.ps_info      = None
     
     # Parse the header
     self.parseFile(offset)
@@ -222,6 +223,8 @@ class JPEG(metainfofile.MetaInfoFile):
         if (seg.read(14, 0) == "Photoshop 3.0\x00"):
           ps = metainfofile.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
           if (1028 in ps.tags):
+            self.iptc_segment = seg
+            self.ps_info      = ps
             self.iptc_info = iptc.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
   
   def writeFile(self, file_path):
@@ -234,13 +237,13 @@ class JPEG(metainfofile.MetaInfoFile):
     byte_str = "Exif\x00\x00"
     
     # Construct the Tiff header
-    ifd_is_be = self.ifds["tiff"].is_be
-    if (ifd_is_be):
+    ifd_big_endian = self.ifds["tiff"].big_endian
+    if (ifd_big_endian):
       byte_str += "\x4d\x4d"
     else:
       byte_str += "\x49\x49"
-    byte_str += byteform.itob(42, 2, big_endian = ifd_is_be)
-    byte_str += byteform.itob(8, 4, big_endian = ifd_is_be)
+    byte_str += byteform.itob(42, 2, big_endian = ifd_big_endian)
+    byte_str += byteform.itob(8, 4, big_endian = ifd_big_endian)
     byte_str += self.getExifBlock()
     
     # Put the Exif data into an appropriate APP1 segment.  FIXME: This
@@ -250,6 +253,10 @@ class JPEG(metainfofile.MetaInfoFile):
     #  self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
     #else:
     self.exif_segment.setData(byte_str)
+    
+    # Prepare the IPTC segment for writing
+    self.ps_info.setTag(1028, self.iptc_info.getBlob())
+    self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
     
     # Iterate over all segments and copy them from the original file or rewrite
     # them.

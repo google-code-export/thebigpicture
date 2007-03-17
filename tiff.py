@@ -13,7 +13,7 @@
 # GNU Lesser General Public License for more details.
 # 
 # You should have received a copy of the GNU Lesser General Public License
-# along with The Big PictureGe; if not, write to the Free Software
+# along with The Big Picture; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
@@ -50,14 +50,14 @@ class Tiff(metainfofile.MetaInfoFile):
     # Read the header
     data = self.fp.read(2)
     if (data == "MM"):
-      self.is_be = True
+      self.big_endian = True
       is_tiff = True
     elif (data == "II"):
-      self.is_be = False
+      self.big_endian = False
       is_tiff = True
       
     # The next two bytes should be 42
-    if (is_tiff) and (byteform.btoi(self.fp.read(2), big_endian = self.is_be) == 42):
+    if (is_tiff) and (byteform.btoi(self.fp.read(2), big_endian = self.big_endian) == 42):
       is_tiff = True
       
     # If the file does not have a Tiff header, report it as false 
@@ -68,18 +68,18 @@ class Tiff(metainfofile.MetaInfoFile):
     
     # Get the first IFD (The "Tiff" tags)
     ifd_offsets = {}
-    ifd_offsets["tiff"] = byteform.btoi(self.fp.read(4), big_endian = self.is_be)
-    self.ifds["tiff"] = exif.TIFF(self.fp, ifd_offsets["tiff"], offset, self.is_be)
+    ifd_offsets["tiff"] = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
+    self.ifds["tiff"] = exif.TIFF(self.fp, ifd_offsets["tiff"], offset, self.big_endian)
     
     # Get the Exif tags
     ifd_offsets["exif"] = self.ifds["tiff"].getTagPayload("Exif IFD Pointer")
     if (ifd_offsets["exif"]):
-      self.ifds["exif"] = exif.Exif(self.fp, ifd_offsets["exif"], offset, self.is_be)
+      self.ifds["exif"] = exif.Exif(self.fp, ifd_offsets["exif"], offset, self.big_endian)
       
     # Get the GPS tags
     ifd_offsets["gps"] = self.ifds["tiff"].getTagPayload("GPSInfo IFD Pointer")
     if (ifd_offsets["gps"]):
-      self.ifds["gps"] = exif.GPS(self.fp, ifd_offsets["gps"], offset, self.is_be)
+      self.ifds["gps"] = exif.GPS(self.fp, ifd_offsets["gps"], offset, self.big_endian)
 
     # Get the IPTC block. The payload isn't the position in the file, but
     # rather the IPTC content. To let the IPTC class do its job, we feed it
@@ -95,16 +95,16 @@ class Tiff(metainfofile.MetaInfoFile):
     #data = convBytes2Int(self.fp.read(4))
     #if (data != 0):
     #  self.ifd_offsets["ifd1"] = data
-    #  self.ifds["ifd1"] = ifd.IFD(self.fp, self.ifd_offsets["ifd1"], self.is_be)
+    #  self.ifds["ifd1"] = ifd.IFD(self.fp, self.ifd_offsets["ifd1"], self.big_endian)
     
   def writeFile(self, file_path):
     out_fp = file(file_path, "w")
-    if (self.is_be):
+    if (self.big_endian):
       out_fp.write("\x4d\x4d")
     else:
       out_fp.write("\x49\x49")
-    out_fp.write(byteform.itob(42, 2, big_endian = self.is_be))
-    out_fp.write(byteform.itob(8, 4, big_endian = self.is_be))
+    out_fp.write(byteform.itob(42, 2, big_endian = self.big_endian))
+    out_fp.write(byteform.itob(8, 4, big_endian = self.big_endian))
     
     exif_ifd_offset = self.ifds["tiff"].getSize() + 8
     gps_ifd_offset  = exif_ifd_offset + self.ifds["exif"].getSize()
