@@ -105,7 +105,7 @@ class Ascii(DataType):
       else:
         stream = stream[0]
         
-    return byte_stream
+    return stream
     
   @classmethod
   def decode(cls, byte_str, is_big_endian = True):

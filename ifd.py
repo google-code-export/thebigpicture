@@ -17,9 +17,9 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import types, byteform, ifddatatypes, tag
+import types, byteform, ifddatatypes, datablock
 
-class Tag(tag.Tag):
+class Tag(datablock.DataBlock):
   """ An IFD tag. """
       
   def __init__(self, *args):
@@ -44,7 +44,7 @@ class Tag(tag.Tag):
       
     # Initialize the base class. The endianness does not even matter, it is
     # never used.
-    tag.Tag.__init__(self, **base_kwargs)
+    datablock.DataBlock.__init__(self, **base_kwargs)
     
   def getDataType(self):
     """ Return the data type of the tag. """

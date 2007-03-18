@@ -17,9 +17,9 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import byteform, tag
+import byteform, datablock
 
-class Photoshop(tag.Tag):
+class Photoshop(datablock.DataBlock):
   """ Read and write the photoshop structure. """
   
   def __init__(self, *args, **kwargs):
@@ -43,7 +43,7 @@ class Photoshop(tag.Tag):
       base_kwargs["length"] = args[2]
       
     # Call the Tag constructor
-    tag.Tag.__init__(self, **base_kwargs)
+    datablock.DataBlock.__init__(self, **base_kwargs)
     
     # Parse the structure
     self.tags = {}
@@ -75,7 +75,7 @@ class Photoshop(tag.Tag):
       data_len = byteform.btoi(self.read(4), big_endian = self.big_endian)
        
       # Store the byte position and data length in the tags dict
-      self.tags[tag_num] = tag.Tag(self.fp, self.byte_pos, data_len)
+      self.tags[tag_num] = datablock.DataBlock(self.fp, self.byte_pos, data_len)
       
       # Skip to the next structure
       self.read(data_len)
@@ -84,7 +84,7 @@ class Photoshop(tag.Tag):
   def setTag(self, tag_num, data):
     """ Set the tag_num to data. """
     
-    self.tags[tag_num] = tag.Tag(data = data)
+    self.tags[tag_num] = datablock.DataBlock(data = data)
     
   def getDataBlock(self):
     """ Return the Photoshop structure as a binary data block. """

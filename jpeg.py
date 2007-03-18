@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import exif, tiff, metainfofile, iptc, byteform, tag
+import exif, tiff, metainfofile, iptc, byteform, datablock
 
 import types
 
@@ -63,7 +63,7 @@ SEG_NUMS = {
   "EOI":   0xD9
 }
 
-class Segment(tag.Tag):
+class Segment(datablock.DataBlock):
   """ A class for managing JPEG segments. """
   
   def __init__(self, *args, **kwargs):
@@ -110,7 +110,7 @@ class Segment(tag.Tag):
       tag_kwargs["length"] = length
     
     # Call the Tag constructor
-    tag.Tag.__init__(self, **tag_kwargs)
+    datablock.DataBlock.__init__(self, **tag_kwargs)
     
   def __parseHeader__(self, header):
     """ Parse the first bytes of the segment header, and return a list of number
