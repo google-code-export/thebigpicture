@@ -249,9 +249,15 @@ class IPTC(datablock.DataBlock):
       # Then follows the tag number
       tag_type = byteform.btoi(self.read(1))
 
-      # The next two bytes determine the payload length
-      length = byteform.btoi(self.read(2))
-      
+      # The next two bytes determine the payload length, or the length of the
+      # fields specifying the payload length if we have an extended tag.
+      length = byteform.btoi(self.read(2), big_endian = self.big_endian)
+      # If the most significant bit is 1, we have an extended tag
+      if (length & 32768): # 10000000 00000000
+        # We have an extended tag
+        length_count = length & 32767 # 01111111 11111111
+        length = byteform.btoi(self.read(length_count), big_endian = self.big_endian)
+
       # Construct the tag and append it to the list
       tag_obj = datablock.DataBlock(self.fp, self.tell() + self.getDataOffset(), length)
       self.records[record_num].appendTag(tag_type, tag_obj)
@@ -268,9 +274,11 @@ class IPTC(datablock.DataBlock):
     # The buffer
     out_str = ""
     
-    # Iterate over all REC_NUMS
+    # Iterate over all REC_NUMS. Records in IPTC should be in numerical order.
     for rec_num in REC_NUMS:
-      # Iterate over all tags in the record
+      # Iterate over all tags in the record. Tag numbers in each record don't
+      # need all to be in numerical order, but it's best to set this anyway.
+      # The getTagNums() method takes care of this.
       for tag_num in self.records[rec_num].getTagNums():
         # Iterate over all the tags with that tag number
         for tag_obj in self.records[rec_num].getTags(tag_num):
@@ -280,8 +288,16 @@ class IPTC(datablock.DataBlock):
           out_str += byteform.itob(tag_num, 1)
           
           # Write the length
-          out_str += byteform.itob(tag_obj.getDataLength(), 2, self.big_endian)
-          
+          length = tag_obj.getDataLength()
+          if (length <= 32767):
+            # Normal tag
+            out_str += byteform.itob(length, 2, big_endian = self.big_endian)
+          else:
+            # Extended tag. We only know how to encode in 4 bytes, so that
+            # that should do it.
+            out_str += byteform.itob(32772, 2, big_endian = self.big_endian) # 10000000 00000100
+            out_str += byteform.itob(length, 4, big_endian = self.big_endian)
+
           # Write the data
           out_str += tag_obj.getData()
           
