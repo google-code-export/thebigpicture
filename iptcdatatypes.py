@@ -26,22 +26,17 @@ class Digits(datatypes.DataType):
   word_width = 1
   
   @classmethod
-  def encode(cls, num, length = None, is_big_endian = True):
-    """ Encode an integer number as string. The optional argument length
-        specifies how many chars the output should occupy. """
+  def encode(cls, num, is_big_endian = True):
+    """ Encode an integer number as string. """
+
+    if (num in [types.ListType, types.TupleType]):
+      num = [num]
     
-    # Convert the number to string
-    byte_str = str(num)
-    
-    # Optionally pad it with zeroes
-    if (length != None):
-      byte_str = (lenth - len(byte_str) * "0") + byte_str
-      
-    return byte_stream
+    return str(num)
     
   @classmethod
   def decode(cls, byte_stream, is_big_endian = True):
-    """ Convert a string of numbers to a single number. """
+    """ Convert a string of numbers to a list containing a single number. """
         
     return [int(byte_str)]
     

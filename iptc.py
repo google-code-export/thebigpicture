@@ -69,9 +69,36 @@ class IPTCRecord:
   @classmethod
   def encode(self, tag, payload, big_endian = True):
     """ Encode the data according to the specifications of the tag. """
-    tag_num = self.getTagNum(tag)
-    index   = self.nums.index(tag_num)
-    data    = iptcdatatypes.TYPES[self.types[index]].encode(payload, is_big_endian = big_endian)
+    
+    # Try to encode the tag
+    tag_num   = self.getTagNum(tag)
+    index     = self.nums.index(tag_num)
+    data_type = self.types[index]
+    if (data_type != None):
+      data = iptcdatatypes.TYPES[data_type].encode(payload, is_big_endian = big_endian)
+    else:
+      # If we don't have a data type, raise an error
+      raise "Setting IPTC tag %s is not implemented!" % str(tag)
+    
+    # Check for the proper length
+    
+    # Retrieve the allowed lengths
+    word_width = iptcdatatypes.TYPES[self.types[index]].word_width
+    if (type(self.counts[index]) == types.ListType):
+      min_length = self.counts[index][0] * word_width
+      max_length = self.counts[index][1] * word_width
+    else:
+      min_length = self.counts[index] * word_width
+      max_length = None
+      
+    # Check lengths
+    if (len(data) < min_length):
+      # If data type is Digits, pad it with zeroes
+      if (self.types[index] == 15):
+        data = (min_length - len(data)) * "0" + data
+    elif (max_length != None) and (len(data) > max_length):
+      raise "Encoded data takes %d bytes, while only %d bytes are allowed!" % (len(data), max_length)
+    
     return data
 
   @classmethod
@@ -286,7 +313,6 @@ class IPTC(datablock.DataBlock):
         
     rec_num, tag_num, tag = self.__getSetData__(tag, payload, record = record)
     if (tag):
-      print self.records
       self.records[rec_num].setTag(tag_num, tag)
     
   def appendTag(self, tag, payload, record = None):
