@@ -65,7 +65,7 @@ class IFD:
     self.fp            = file_pointer
     self.header_offset = header_offset
     self.ifd_offset    = ifd_offset + self.header_offset
-    self.big_endian         = big_endian
+    self.big_endian    = big_endian
 
     # The fields dict stores all the tags read from disk and/or set by the user.
     self.mapDiskFields()

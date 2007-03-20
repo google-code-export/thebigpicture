@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import datablock, byteform, types, iptcdatatypes
+import datablock, byteform, types, iptcdatatypes, qdb
 
 class IPTCRecord:
   """ Base class for retrieving data about tags in IPTC records. Derived
@@ -146,9 +146,10 @@ class IPTCPostObjectData(IPTCRecord):
   types  = [None]
   
 # The possible IPTC record names and numbers. This data is taken from the Exiftool documentation
-REC_NUMS  = [1, 2, 3, 7, 8, 9]
-REC_NAMES = ["IPTCEnvelope", "IPTCApplication", "IPTCNewsPhoto", "IPTCPreObjectData", "IPTCObjectData", "IPTCPostObjectData"]
-RECORDS   = [IPTCEnvelope, IPTCApplication, IPTCNewsPhoto, IPTCPreObjectData, IPTCObjectData, IPTCPostObjectData]
+class RECORDS(qdb.QDB):
+  num    = [1, 2, 3, 7, 8, 9]
+  name   = ["IPTCEnvelope", "IPTCApplication", "IPTCNewsPhoto", "IPTCPreObjectData", "IPTCObjectData", "IPTCPostObjectData"]
+  record = [IPTCEnvelope, IPTCApplication, IPTCNewsPhoto, IPTCPreObjectData, IPTCObjectData, IPTCPostObjectData]
 
 class TagList:
   """ Manage lists of IPTC tags within a record. IPTC blocks can have multiple
@@ -228,7 +229,7 @@ class IPTC(datablock.DataBlock):
     
     # We keep an internal map of all the records
     self.records = {}
-    for rec_num in REC_NUMS:
+    for rec_num in RECORDS.getList("num"):
       self.records[rec_num] = TagList()
       
     # Parse the file
@@ -274,8 +275,9 @@ class IPTC(datablock.DataBlock):
     # The buffer
     out_str = ""
     
-    # Iterate over all REC_NUMS. Records in IPTC should be in numerical order.
-    for rec_num in REC_NUMS:
+    # Iterate over all record numbers. Records in IPTC should be in numerical
+    # order.
+    for rec_num in RECORDS.getList("num"):
       # Iterate over all tags in the record. Tag numbers in each record don't
       # need all to be in numerical order, but it's best to set this anyway.
       # The getTagNums() method takes care of this.
@@ -343,14 +345,14 @@ class IPTC(datablock.DataBlock):
     
     # Test numerical input
     if (type(record) == types.IntType):
-      if record in REC_NUMS:
+      if record in RECORDS.getList("num"):
         return record
       else:
         raise "Unknown IPTC record %d!" % record
     # Test text input
     elif (type(record) == types.StringType):
-      if (record in REC_NAMES):
-        return REC_NUMS[REC_NAMES.index(record)]
+      if (record in RECORDS.getList("name")):
+        return RECORDS.query("num", "name", record)
       else:
         raise "Unknown IPTC record %s!" % record
     else:
@@ -364,7 +366,7 @@ class IPTC(datablock.DataBlock):
       
     # If the user didn't specify a record, we search through all records
     if (record == None):
-      record = REC_NUMS
+      record = RECORDS.getList("num")
     # Otherwise, we need to have a record number
     else:
       record = self.__getRecordNum__(record)
@@ -372,7 +374,7 @@ class IPTC(datablock.DataBlock):
     # Find the possible records
     found_records = []
     for rec_num in record:
-      tag_num = RECORDS[REC_NUMS.index(rec_num)].getTagNum(tag)
+      tag_num = RECORDS.query("record", "num", rec_num).getTagNum(tag)
       if (tag_num != None):
         found_records.append([rec_num, tag_num])
 
@@ -394,7 +396,7 @@ class IPTC(datablock.DataBlock):
     
     if ((rec_num != None) and (tag_num != None)):
       # Encode the data
-      data = RECORDS[REC_NUMS.index(rec_num)].encode(tag_num, payload, big_endian = self.big_endian)
+      data = RECORDS.query("record", "num", rec_num).encode(tag_num, payload, big_endian = self.big_endian)
       tag = datablock.DataBlock(data = data)
     else:
       raise "No valid destination could be found for tag %s" % str(tag)
