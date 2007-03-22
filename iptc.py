@@ -19,18 +19,17 @@
 
 import datablock, byteform, types, iptcdatatypes, qdb
 
-class IPTCRecord:
+class IPTCRecord(qdb.QDB):
   """ Base class for retrieving data about tags in IPTC records. Derived
       classes should implement the following lists:
-      - names : the names of the tags
-      - nums  : the numbers of the tags
-      - counts: the number of words every tag should occupy, with None
+      - name : the names of the tags
+      - num  : the numbers of the tags
+      - count: the number of words every tag should occupy, with None
                     to indicate that this is free
-      - types : the numbers of tag data types of the tags, as found in
+      - type : the numbers of tag data types of the tags, as found in
                 iptcdatatypes.TYPES
   """
   
-  @classmethod
   def getTagNum(self, tag):
     """ Returns a tag number when fed a tag number or name, or None if it
         doesn't exist within the current record. """
@@ -39,41 +38,35 @@ class IPTCRecord:
     
     if (type(tag) == types.IntType):
       # We have a tag number as user input
-      if tag in self.nums:
+      if tag in self.num:
         ret = tag
     elif (type(tag) == types.StringType):
       # We have a tag name, search the number for it
       try:
-        index = self.names.index(tag)
-        ret = self.nums[index]
+        ret = self.query("name", tag, "num")
       except ValueError:
         pass
   
     return ret
 
-  @classmethod
   def getDataType(self, tag):
     """ Return the data type for a certain tag (name or number). """
     tag_num   = self.getTagNum(tag)
-    data_type = self.data_types(self.tag_nums.index(tag_num))
+    data_type = self.query("num", tag_num, "type")
     return data_type
 
-  @classmethod
   def getCount(self, tag):
     """ Return the count for a certain tag (name or number), if any, or None
         if otherwise. """
     tag_num = self.getTagNum(tag)
-    count   = self.data_types(self.tag_counts.index(tag_num))
-    return count
+    return self.query("num", tag_num, "count")
 
-  @classmethod
   def encode(self, tag, payload, big_endian = True):
     """ Encode the data according to the specifications of the tag. """
     
     # Try to encode the tag
-    tag_num   = self.getTagNum(tag)
-    index     = self.nums.index(tag_num)
-    data_type = self.types[index]
+    index = self.query("num", self.getTagNum(tag))
+    data_type = self.query(index, "type")
     if (data_type != None):
       data = iptcdatatypes.TYPES[data_type].encode(payload, is_big_endian = big_endian)
     else:
@@ -83,73 +76,73 @@ class IPTCRecord:
     # Check for the proper length
     
     # Retrieve the allowed lengths
-    word_width = iptcdatatypes.TYPES[self.types[index]].word_width
-    if (type(self.counts[index]) == types.ListType):
-      min_length = self.counts[index][0] * word_width
-      max_length = self.counts[index][1] * word_width
+    word_width = iptcdatatypes.TYPES[data_type].word_width
+    count = self.query(index, "count")
+    if (type(count) == types.ListType):
+      min_length = count[0] * word_width
+      max_length = count[1] * word_width
     else:
-      min_length = self.counts[index] * word_width
+      min_length = count * word_width
       max_length = None
       
     # Check lengths
     if (len(data) < min_length):
       # If data type is Digits, pad it with zeroes
-      if (self.types[index] == 15):
+      if (data_type == 15):
         data = (min_length - len(data)) * "0" + data
     elif (max_length != None) and (len(data) > max_length):
       raise "Encoded data takes %d bytes, while only %d bytes are allowed!" % (len(data), max_length)
     
     return data
 
-  @classmethod
   def decode(self, tag, data, big_endian = True):
     """ Encode the data according to the specifications of the tag. """
-    tag_num = self.getTagNum(tag)
-    index   = self.nums.index(tag_num)
-    payload = iptcdatatypes.TYPES[self.types[index]].decode(data, is_big_endian = big_endian)
+    tag_num    = self.getTagNum(tag)
+    data_type = self.query("num", tag_num, "type")
+    payload = iptcdatatypes.TYPES[data_type].decode(data, is_big_endian = big_endian)
     return payload
 
 class IPTCEnvelope(IPTCRecord):
-  names  = ["EnvelopeRecordVersion", "Destination", "FileFormat", "FileVersion", "ServiceIdentifier", "EnvelopeNumber", "ProductID", "EnvelopePriority", "DateSent", "TimeSent", "CodedCharacterSet", "UniqueObjectName", "ARMIdentifier", "ARMVersion"]
-  nums   = [0, 5, 20, 22, 30, 40, 50, 60, 70, 80, 90, 100, 120, 122]
-  counts = [1, 1, 1, 1, [0, 10], 8, [0, 32], 1, 8, 11, [0.32], [14, 80], 1, 1]
-  types  = [3, 2, 3, 3, 2, 15, 2, 15, 15, 2, 2, 2, 3, 3]
+  name  = ["EnvelopeRecordVersion", "Destination", "FileFormat", "FileVersion", "ServiceIdentifier", "EnvelopeNumber", "ProductID", "EnvelopePriority", "DateSent", "TimeSent", "CodedCharacterSet", "UniqueObjectName", "ARMIdentifier", "ARMVersion"]
+  num   = [0, 5, 20, 22, 30, 40, 50, 60, 70, 80, 90, 100, 120, 122]
+  count = [1, 1, 1, 1, [0, 10], 8, [0, 32], 1, 8, 11, [0.32], [14, 80], 1, 1]
+  type  = [3, 2, 3, 3, 2, 15, 2, 15, 15, 2, 2, 2, 3, 3]
 
 class IPTCApplication(IPTCRecord):
-  names  = ["ApplicationRecordVersion","ObjectTypeReference","ObjectAttributeReference","ObjectName","EditStatus","EditorialUpdate","Urgency","SubjectReference","Category","SupplementalCategories","FixtureIdentifier","Keywords","ContentLocationCode","ContentLocationName","ReleaseDate","ReleaseTime","ExpirationDate","ExpirationTime","SpecialInstructions","ActionAdvised","ReferenceService","ReferenceDate","ReferenceNumber","DateCreated","TimeCreated","DigitalCreationDate","DigitalCreationTime","OriginatingProgram","ProgramVersion","ObjectCycle","By-line","By-lineTitle","City","Sub-location","Province-State","Country-PrimaryLocationCode","Country-PrimaryLocationName","OriginalTransmissionReference","Headline","Credit","Source","CopyrightNotice","Contact","Caption-Abstract","LocalCaption","Writer-Editor","RasterizedCaption","ImageType","ImageOrientation","LanguageIdentifier","AudioType","AudioSamplingRate","AudioSamplingResolution","AudioDuration","AudioOutcue","JobID","MasterDocumentID","ShortDocumentID","UniqueDocumentID","OwnerID","ObjectPreviewFileFormat","ObjectPreviewFileVersion","ObjectPreviewData","ClassifyState","SimilarityIndex","DocumentNotes","DocumentHistory","ExifCameraInfo"]
-  nums   = [0, 3, 4, 5, 7, 8, 10, 12, 15, 20, 22, 25, 26, 27, 30, 35, 37, 38, 40, 42, 45, 47, 50, 55, 60, 62, 63, 65, 70, 75, 80, 85, 90, 92, 95, 100, 101, 103, 105, 110, 115, 116, 118, 120, 121, 122, 125, 130, 131, 135, 150, 151, 152, 153, 154, 184, 185, 186, 187, 188, 200, 201, 202, 225, 228, 230, 231, 232]
-  counts = [1, [3, 67], [4, 68], [0, 64], [0, 64], 2, 1, [13, 236], [0, 3], [0, 32], [0, 32], [0, 64], 3, [0, 64], 8, 11, 8, 11, [0, 256], 2, [0, 10], 8, 8, 8, 11, 8, 11, [0, 32], [0, 10], 1, [0, 32], [0, 32], [0, 32], [0, 32], [0, 32], 3, [0, 64], [0, 32], [0, 256], [0, 32], [0, 32], [0, 128], [0, 128], [0, 2000], [0, 256], [0, 32], 7360, 2, 1, [2, 3], 2, 6, 2, 6, [0, 64], [0, 64], [0, 256], [0, 64], [0, 128], [0, 128], 0, 1, [0, 256000], [0, 64], [0, 32], [0, 1024], [0, 256], [0, 4096]]
-  types  = [3, 2, 2, 2, 2, 15, 15, 2, 2, 2, 2, 2, 2, 2, 15, 2, 15, 2, 2, 15, 2, 15, 15, 15, 2, 15, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 15, 15, 15, 2, 2, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 2]
+  name  = ["ApplicationRecordVersion","ObjectTypeReference","ObjectAttributeReference","ObjectName","EditStatus","EditorialUpdate","Urgency","SubjectReference","Category","SupplementalCategories","FixtureIdentifier","Keywords","ContentLocationCode","ContentLocationName","ReleaseDate","ReleaseTime","ExpirationDate","ExpirationTime","SpecialInstructions","ActionAdvised","ReferenceService","ReferenceDate","ReferenceNumber","DateCreated","TimeCreated","DigitalCreationDate","DigitalCreationTime","OriginatingProgram","ProgramVersion","ObjectCycle","By-line","By-lineTitle","City","Sub-location","Province-State","Country-PrimaryLocationCode","Country-PrimaryLocationName","OriginalTransmissionReference","Headline","Credit","Source","CopyrightNotice","Contact","Caption-Abstract","LocalCaption","Writer-Editor","RasterizedCaption","ImageType","ImageOrientation","LanguageIdentifier","AudioType","AudioSamplingRate","AudioSamplingResolution","AudioDuration","AudioOutcue","JobID","MasterDocumentID","ShortDocumentID","UniqueDocumentID","OwnerID","ObjectPreviewFileFormat","ObjectPreviewFileVersion","ObjectPreviewData","ClassifyState","SimilarityIndex","DocumentNotes","DocumentHistory","ExifCameraInfo"]
+  num   = [0, 3, 4, 5, 7, 8, 10, 12, 15, 20, 22, 25, 26, 27, 30, 35, 37, 38, 40, 42, 45, 47, 50, 55, 60, 62, 63, 65, 70, 75, 80, 85, 90, 92, 95, 100, 101, 103, 105, 110, 115, 116, 118, 120, 121, 122, 125, 130, 131, 135, 150, 151, 152, 153, 154, 184, 185, 186, 187, 188, 200, 201, 202, 225, 228, 230, 231, 232]
+  count = [1, [3, 67], [4, 68], [0, 64], [0, 64], 2, 1, [13, 236], [0, 3], [0, 32], [0, 32], [0, 64], 3, [0, 64], 8, 11, 8, 11, [0, 256], 2, [0, 10], 8, 8, 8, 11, 8, 11, [0, 32], [0, 10], 1, [0, 32], [0, 32], [0, 32], [0, 32], [0, 32], 3, [0, 64], [0, 32], [0, 256], [0, 32], [0, 32], [0, 128], [0, 128], [0, 2000], [0, 256], [0, 32], 7360, 2, 1, [2, 3], 2, 6, 2, 6, [0, 64], [0, 64], [0, 256], [0, 64], [0, 128], [0, 128], 0, 1, [0, 256000], [0, 64], [0, 32], [0, 1024], [0, 256], [0, 4096]]
+  type  = [3, 2, 2, 2, 2, 15, 15, 2, 2, 2, 2, 2, 2, 2, 15, 2, 15, 2, 2, 15, 2, 15, 15, 15, 2, 15, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 15, 15, 15, 2, 2, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 2]
   
 class IPTCNewsPhoto(IPTCRecord):
-  names  = ["NewsPhotoVersion","IPTCPictureNumber","IPTCImageWidth","IPTCImageHeight","IPTCPixelWidth","IPTCPixelHeight","SupplementalType","ColorRepresentation","InterchangeColorSpace","ColorSequence","ICC_Profile","ColorCalibrationMatrix","LookupTable","NumIndexEntries","ColorPalette","IPTCBitsPerSample","SampleStructure","ScanningDirection","IPTCImageRotation","DataCompressionMethod","QuantizationMethod","EndPoints","ExcursionTolerance","BitsPerComponent","MaximumDensityRange","GammaCompensatedValue"]
-  nums   = [0, 10, 20, 30, 40, 50, 55, 60, 64, 65, 66, 70, 80, 84, 85, 86, 90, 100, 102, 110, 120, 125, 130, 135, 140, 145]
-  counts = [1, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-  types  = [3, 2, 3, 3, 3, 3, 1, 3, 1, 1, None, None, None, 3, None, 1, 1, 1, 1, 4, 1, None, 1, 1, 3, 3]
+  name  = ["NewsPhotoVersion","IPTCPictureNumber","IPTCImageWidth","IPTCImageHeight","IPTCPixelWidth","IPTCPixelHeight","SupplementalType","ColorRepresentation","InterchangeColorSpace","ColorSequence","ICC_Profile","ColorCalibrationMatrix","LookupTable","NumIndexEntries","ColorPalette","IPTCBitsPerSample","SampleStructure","ScanningDirection","IPTCImageRotation","DataCompressionMethod","QuantizationMethod","EndPoints","ExcursionTolerance","BitsPerComponent","MaximumDensityRange","GammaCompensatedValue"]
+  num   = [0, 10, 20, 30, 40, 50, 55, 60, 64, 65, 66, 70, 80, 84, 85, 86, 90, 100, 102, 110, 120, 125, 130, 135, 140, 145]
+  count = [1, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  type  = [3, 2, 3, 3, 3, 3, 1, 3, 1, 1, None, None, None, 3, None, 1, 1, 1, 1, 4, 1, None, 1, 1, 3, 3]
   
 class IPTCPreObjectData(IPTCRecord):
-  names  = ["SizeMode", "MaxSubfileSize", "ObjectSizeAnnounced", "MaximumObjectSize"]
-  nums   = [10, 20, 90, 95]
-  counts = [None, None, None, None]
-  types  = [None, None, None, None]
+  name  = ["SizeMode", "MaxSubfileSize", "ObjectSizeAnnounced", "MaximumObjectSize"]
+  num   = [10, 20, 90, 95]
+  count = [None, None, None, None]
+  type  = [None, None, None, None]
   
 class IPTCObjectData(IPTCRecord):
-  names  = ["SubFile"]
-  nums   = [10]
-  counts = [None]
-  types  = [None]
+  name  = ["SubFile"]
+  num   = [10]
+  count = [None]
+  type  = [None]
   
 class IPTCPostObjectData(IPTCRecord):
-  names  = ["ConfirmedObjectSize"]
-  nums   = [10]
-  counts = [None]
-  types  = [None]
+  name  = ["ConfirmedObjectSize"]
+  num   = [10]
+  count = [None]
+  type  = [None]
   
 # The possible IPTC record names and numbers. This data is taken from the Exiftool documentation
-class RECORDS(qdb.QDB):
-  num    = [1, 2, 3, 7, 8, 9]
-  name   = ["IPTCEnvelope", "IPTCApplication", "IPTCNewsPhoto", "IPTCPreObjectData", "IPTCObjectData", "IPTCPostObjectData"]
-  record = [IPTCEnvelope, IPTCApplication, IPTCNewsPhoto, IPTCPreObjectData, IPTCObjectData, IPTCPostObjectData]
+RECORDS = qdb.QDB()
+RECORDS.addList("num", [1, 2, 3, 7, 8, 9])
+RECORDS.addList("name", ["IPTCEnvelope", "IPTCApplication", "IPTCNewsPhoto", "IPTCPreObjectData", "IPTCObjectData", "IPTCPostObjectData"])
+RECORDS.addList("record", [IPTCEnvelope(), IPTCApplication(), IPTCNewsPhoto(), IPTCPreObjectData(), IPTCObjectData(), IPTCPostObjectData()])
 
 class TagList:
   """ Manage lists of IPTC tags within a record. IPTC blocks can have multiple
@@ -352,7 +345,7 @@ class IPTC(datablock.DataBlock):
     # Test text input
     elif (type(record) == types.StringType):
       if (record in RECORDS.getList("name")):
-        return RECORDS.query("num", "name", record)
+        return RECORDS.query("name", record, "num")
       else:
         raise "Unknown IPTC record %s!" % record
     else:
@@ -374,8 +367,8 @@ class IPTC(datablock.DataBlock):
     # Find the possible records
     found_records = []
     for rec_num in record:
-      tag_num = RECORDS.query("record", "num", rec_num).getTagNum(tag)
-      if (tag_num != None):
+      tag_num = RECORDS.query("num", rec_num, "record").getTagNum(tag)
+      if (tag_num != False):
         found_records.append([rec_num, tag_num])
 
     # Warn if the tag occurs in multiple records
@@ -396,7 +389,7 @@ class IPTC(datablock.DataBlock):
     
     if ((rec_num != None) and (tag_num != None)):
       # Encode the data
-      data = RECORDS.query("record", "num", rec_num).encode(tag_num, payload, big_endian = self.big_endian)
+      data = RECORDS.query("num", rec_num, "record").encode(tag_num, payload, big_endian = self.big_endian)
       tag = datablock.DataBlock(data = data)
     else:
       raise "No valid destination could be found for tag %s" % str(tag)
