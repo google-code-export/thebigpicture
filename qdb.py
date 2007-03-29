@@ -73,9 +73,9 @@ class QDB:
       # If the user specified the name of a list for return values, search this
       # list
       if (return_var_name):
-          return_values = []
-          for index in indices:
-            return_values.append(return_var[index])
+        return_values = []
+        for index in indices:
+          return_values.append(return_var[index])
             
       # Otherwise, return the indices
       else:
@@ -86,7 +86,16 @@ class QDB:
       return return_values[0]
     else:
       return return_values
-          
+       
+  def setValue(self, key_var_name, condition, target_var_name, value):
+    """ Sets the value of target_var_name to value where key_var_name follows
+        the condition. """
+    # TODO: Should accept index argument, like query does
+    
+    index = self.query(key_var_name, condition)
+    target_var = getattr(self, target_var_name)
+    target_var[index] = value
+    
   def getList(self, var_name):
     """ Return one of the list, named var_name. """
     return getattr(self, var_name)

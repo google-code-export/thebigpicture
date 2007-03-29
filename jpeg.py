@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import exif, tiff, metainfofile, iptc, byteform, datablock
+import exif, tiff, metainfofile, byteform, datablock, iptc, photoshop
 
 import types
 
@@ -212,20 +212,21 @@ class JPEG(metainfofile.MetaInfoFile):
       if (seg.read(6, 0) == "Exif\x00\x00"):
         self.exif_segment = seg
         tiff_block = tiff.Tiff(self.fp, seg.getDataOffset() + 6) # 6 bytes Exif marker
-        self.ifds = tiff_block.ifds
-        self.iptc_info = tiff_block.iptc_info
+        self.exif = tiff_block.exif
+        #self.iptc = tiff_block.iptc
         break
 
     # If the IPTC info wasn't encoded in the Tiff IFD, we can look for it in
     # APP13 (Photoshop data) (0xED)
-    if (not self.iptc_info):
+    self.iptc = None
+    if (not self.iptc): # FIXME: This does not work anymore, an IPTC objext is always created
       for seg in self.segments[SEG_NUMS["APP13"]]:
         if (seg.read(14, 0) == "Photoshop 3.0\x00"):
-          ps = metainfofile.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
+          ps = photoshop.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
           if (1028 in ps.tags):
             self.iptc_segment = seg
             self.ps_info      = ps
-            self.iptc_info = iptc.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
+            self.iptc = iptc.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
   
   def writeFile(self, file_path):
     # Open the new file for writing
@@ -237,14 +238,14 @@ class JPEG(metainfofile.MetaInfoFile):
     byte_str = "Exif\x00\x00"
     
     # Construct the Tiff header
-    ifd_big_endian = self.ifds["tiff"].big_endian
+    ifd_big_endian = self.exif.big_endian
     if (ifd_big_endian):
       byte_str += "\x4d\x4d"
     else:
       byte_str += "\x49\x49"
     byte_str += byteform.itob(42, 2, big_endian = ifd_big_endian)
     byte_str += byteform.itob(8, 4, big_endian = ifd_big_endian)
-    byte_str += self.getExifBlock()
+    byte_str += self.getExifBlob(8)
     
     # Put the Exif data into an appropriate APP1 segment.  FIXME: This
     # invalidates that segment for feature data extraction.
@@ -255,7 +256,7 @@ class JPEG(metainfofile.MetaInfoFile):
     self.exif_segment.setData(byte_str)
     
     # Prepare the IPTC segment for writing
-    self.ps_info.setTag(1028, self.iptc_info.getBlob())
+    self.ps_info.setTag(1028, self.iptc.getBlob())
     self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
     
     # Iterate over all segments and copy them from the original file or rewrite

@@ -1,23 +1,22 @@
 class DataBlock:
-  """ General class for a data blovk on disk or in memory, which may be an Exif,
+  """ General class for a data block on disk or in memory, which may be an Exif,
       IPTC, Photoshop (...) element, but also a tag in one of these elements.
-      It can either save a file pointer, offset and length, or actual binary
-      data. """
+      It can either save a file pointer, offset and optional length, or actual
+      binary data. """
       
   def __init__(self, fp = None, offset = None, length = None, data = None):
     """ A tag may be initialized with binary data, or a list of file pointer,
-        offset and length in bytes, or a list of only file pointer and offset,
-        but then the derived class should set the length parameter. """
+        offset and optionally a length in bytes. """
 
     # Do some calling checks
     proper_call = True
     if (fp or offset or length):
       if (data):
         proper_call = False
-      if not (fp and offset and length):
+      if not (fp and offset):
         proper_call = False
     if not (proper_call):
-      raise "Either initialize a Tag with file pointer, byte offset and length, or with a data block!"
+      raise TypeError, "Either initialize a Tag with file pointer, byte offset and optional length, or with a data block!"
       
     # Check in which form we were called
     self.fp          = None
@@ -31,6 +30,8 @@ class DataBlock:
       self.length      = length
     elif (data):
       self.setData(data)
+    else:
+      self.length = 0
     
     # Needed for reading from file or string
     self.byte_pos = 0
@@ -44,7 +45,7 @@ class DataBlock:
     self.length      = None
     
   def getDataLength(self):
-    """ Return the length of the data, or None if the Tag object is empty. """
+    """ Return the length of the data, or None if this is unknown. """
     
     if (self.data):
       return len(self.data)
@@ -61,35 +62,43 @@ class DataBlock:
     # Seek to the specified position
     if (seek != None): # Explicit test, because 0 is a valid value 
       self.seek(seek)
-  
-    # Find out the number of bytes we should read
-    if not (num_bytes):
-      num_bytes = self.getDataLength() - self.byte_pos
-      
-    # Check if we can do the reading
-    if ((self.byte_pos + num_bytes) > self.getDataLength()):
-      raise "Attempt to read beyond the size of the data block!"
-      
+
+    if (num_bytes != None):
+      # Check if we can do the reading
+      length = self.getDataLength()
+      if (length) and ((self.byte_pos + num_bytes) > length):
+        raise IOError, "Attempt to read beyond the size of the data block!"
+
     # Read the bytes from either file or string
     if (self.fp) and (self.data_offset):
       self.fp.seek(self.data_offset + self.byte_pos)
+      if (num_bytes == None):
+        if (self.length):
+          num_bytes = self.length - self.byte_pos
+        else:
+          num_bytes = -1
       data = self.fp.read(num_bytes)
     elif (self.data):
-      data = self.data[self.byte_pos:self.byte_pos + num_bytes]
+      if (num_bytes != None):
+        data = self.data[self.byte_pos:self.byte_pos + num_bytes]
+      else:
+        data = self.data[self.byte_pos:]
       
     # Update the byte position
-    self.byte_pos += num_bytes
+    if (data):
+      self.byte_pos += len(data)
     
     return data
     
   def seek(self, position):
     """ Sets the byte position to the specified position. """
 
-    if (position > self.getDataLength()):
-      raise "Trying to seek outside data block."
+    data_length = self.getDataLength()
+    if (data_length) and (position > data_length):
+      raise IOError, "Trying to seek outside data block."
     else:
       self.byte_pos = position
-    
+
   def getData(self):
     """ Return the data blob. """
     return self.read(seek = 0)

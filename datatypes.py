@@ -146,6 +146,9 @@ class Undefined(DataType):
   
   @classmethod
   def encode(cls, byte_stream, is_big_endian = True):
+    if (type(byte_stream) in [types.ListType, types.TupleType]):
+      if (len(byte_stream) == 1):
+        byte_stream = byte_stream[0]
     if (type(byte_stream) != types.StringType):
       raise "You need to encode the data stream yourself for type UNDEFINED!"
       
@@ -184,18 +187,3 @@ class Double(DataType):
   signed       = None
   word_encoder = staticmethod(ftob)
   word_decoder = staticmethod(btof)
-  
-TYPES = {
-  1: Byte,
-  2: Ascii,
-  3: Short,
-  4: Long,
-  5: Rational,
-  6: SByte,
-  7: Undefined,
-  8: SShort,
-  9: SLong,
-  10: SRational,
-  11: Float,
-  12: Double
-} 

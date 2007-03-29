@@ -17,108 +17,248 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import byteform, datablock
+import byteform, datablock, qdb, types
+   
+class MetaInfoBlock(datablock.DataBlock):
+   
+##  def __init__(self):
+##    """ Placeholder. Wrapper functions should override this. """
+##    
+##    # Derived classes should override this
+##    self.records = qdb.QDB()
+    
+  def getTag(self, tag, record = None):
+    """ Return the tag data with the specified number from the specified record.
+    """
+    
+    # Get the record and tag nums
+    record_num, tag_num = self.__getRecordAndTagNum__(tag, record)
 
-class Photoshop(datablock.DataBlock):
-  """ Read and write the photoshop structure. """
+    if (record_num):
+      data = self.records.query("num", record_num, "record").getTagPayload(tag_num)
+      return data
+    return None
+    
+  def setTag(self, tag, payload, record = None):
+    """ Set the specified tag in the specified record to the data, overriding
+        all other occurences of that tag. If record num is omitted, the method
+        will try to figure out which record is meant. """
+        
+    rec_num, tag_num = self.__getRecordAndTagNum__(tag)
+    if (rec_num):
+      self.records.query("num", rec_num, "record").setTag(tag_num, payload)
+
+##  def appendTag(self, tag, payload, record = None):
+##    """ Append the specified tag in the specified record to the data. """
+##    
+##    rec_num, tag_num, tag = self.__getSetData__(tag, payload, record = record)
+##    if (tag):
+##      self.records[rec_num].appendTag(tag_num, tag)
   
-  def __init__(self, *args, **kwargs):
-    """ Initialize the structure. It may be done by passing an open file object,
-        offset to the start of the structure, and length, or by passing the
-        binary content as string. An optional big_endian argument may be given
-        to determine the byte ordering (defaults to big endian). """
-      
-    # Check for the endiannnes parameter
-    if ("big_endian" in kwargs): self.big_endian = kwargs["big_endian"]
-    else: self.big_endian = True
-    
-    # Find out in which form we were called and set the parameters correct for
-    # the Tag constructor
-    base_kwargs = {}
-    if (len(args) == 1):
-      base_kwargs[data] = args[0]
-    elif (len(args) == 3):
-      base_kwargs["fp"]     = args[0]
-      base_kwargs["offset"] = args[1]
-      base_kwargs["length"] = args[2]
-      
-    # Call the Tag constructor
-    datablock.DataBlock.__init__(self, **base_kwargs)
-    
-    # Parse the structure
-    self.tags = {}
-    self.parse()
-    
-  def parse(self):
-    """ Parse the structure. """
-    
-    while (self.byte_pos < self.length):
-      # The first four bytes of a data structure should always be the ASCII
-      # string 8BIM
-      data = self.read(4)
-      if (data != "8BIM"):
-        break
+##  def encode(self, rec_num, tag_num, payload):
+##    """ Encode the data according to the specifications of the tag. """
+##    
+##    # Try to encode the tag
+##    record = self.records.query("num", rec_num, "table")
+##    data_types = record.getDataType(tag_num)
+##    if (data_types != None):
+##      # Try to encode the data with each of the possible data types. Stop when
+##      # we succeeded.
+##      if (type(data_types) != types.ListType):
+##        data_types = [data_types]
+##        
+##      success = False
+##      for data_type in data_types:
+##        try:
+##          data = self.DATA_TYPES[data_type].encode(payload, self.big_endian)
+##          success = True
+##        except:
+##          pass
+##        if (success):
+##          break
+##    else:
+##      # If we don't have a data type, raise an error
+##      raise "Setting tag %s is not implemented!" % str(tag)
+##    
+##    # Check for the proper length
+##    
+##    # Retrieve the allowed lengths
+##    word_width = self.DATA_TYPES[data_type].word_width
+##    count = record.getCount(tag_num)
+##    if (type(count) == types.ListType):
+##      min_length = count[0] * word_width
+##      max_length = count[1] * word_width
+##    else:
+##      min_length = count * word_width
+##      max_length = None
+##      
+##    # Check lengths
+##    if (len(data) < min_length) or ((max_length != None) and (len(data) > max_length)):
+##      raise ValueError, "Encoded data takes %d bytes, while only %d bytes are allowed!" % (len(data), max_length)
+##    
+##    return data
 
-      # The next two bytes specify the resource ID (tag number)
-      tag_num = byteform.btoi(self.read(2), big_endian = self.big_endian)
-        
-      # What then follows is the "Pascal string". The first byte determines its
-      # length. If the total is an uneven number, it is padded with a \x00
-      # character. We don't need this string, so we step over it. 
-      ps_len =  byteform.btoi(self.read(1), big_endian = self.big_endian)
-      if ((ps_len % 2) == 0):
-        ps_len += 1
-      self.read(ps_len)
-        
-      # Now it's getting interesting; the next four bytes determine the length
-      # of the data
-      data_len = byteform.btoi(self.read(4), big_endian = self.big_endian)
-       
-      # Store the byte position and data length in the tags dict
-      self.tags[tag_num] = datablock.DataBlock(self.fp, self.byte_pos, data_len)
-      
-      # Skip to the next structure
-      self.read(data_len)
+##  def decode(self, tag, data, big_endian = True):
+##    """ Encode the data according to the specifications of the tag. """
+##    
+##    record_num, tag_num = self.__getRecordAndTagNum__(tag)
+##    data_type = self.records.query("num", record_num, "record").getDataType(tag_num)
+##    payload = self.DATA_TYPES[data_type].decode(data, is_big_endian = self.big_endian)
+##    return payload
 
+  def __getRecordNum__(self, record):
+    """ Returns the record number based on a record number or name. """
+    
+    # Test numerical input
+    if (type(record) == types.IntType):
+      if record in self.records.getList("num"):
+        return record
+      else:
+        raise "Unknown record %d!" % record
+    # Test text input
+    elif (type(record) == types.StringType):
+      if (record in self.records.getList("name")):
+        return self.records.query("name", record, "num")
+      else:
+        raise "Unknown record %s!" % record
+    else:
+      raise "I can't make sense of an record of type %s!" % type(record)
 
-  def setTag(self, tag_num, data):
-    """ Set the tag_num to data. """
-    
-    self.tags[tag_num] = datablock.DataBlock(data = data)
-    
-  def getDataBlock(self):
-    """ Return the Photoshop structure as a binary data block. """
+  def __getRecordAndTagNum__(self, tag, record = None):
+    """ Return the record number and tag number for the supplied tag number or
+        name in the specified record name or number. If record is omitted, the
+        method will search in all records and raises an error if doubles are
+        found. """
+      
+    # If the user didn't specify a record, we search through all records
+    if (record == None):
+      records = self.records.getList("num")
+    # Otherwise, we need to have a record number
+    else:
+      records = [self.__getRecordNum__(record)]
 
-    # Store the buffer as string    
-    out_str = ""
+    # Find the possible records
+    found_records = []
+    for rec_num in records:
+      tag_num = self.records.query("num", rec_num, "record").getTagNum(tag)
+      if (tag_num is not False):
+        found_records.append([rec_num, tag_num])
+
+    # Warn if the tag occurs in multiple records
+    if (len(found_records) == 0):
+      raise KeyError, "Tag %s is unknown!" % str(tag)
+    elif (len(found_records) > 1):
+      raise "Tag %s occurs in multiple records!" % str(tag)
+      
+    return found_records[0]
+
+  def __getSetData__(self, tag, payload, record = None):
+    """ Return the record number, tag number, and DataBlock object for numeric
+        or name inputs. This method is used by the setTag and appendTag methods.
+    """
+        
+    # Get the record and tag number
+    rec_num, tag_num = self.__getRecordAndTagNum__(tag, record)
     
-    # Iterate over all tags
-    for tag_num in self.tags:
-      tag = self.tags[tag_num]
-      
-      # Every data structure starts with "8BIM"
-      out_str += "8BIM"
-      
-      # The next two bytes specify the resource ID (tag number)
-      out_str += byteform.itob(tag_num, 2, big_endian = self.big_endian)
+    if ((rec_num != None) and (tag_num != None)):
+      # Encode the data
+      data = self.encode(rec_num, tag_num, payload)
+      tag = datablock.DataBlock(data = data)
+    else:
+      raise "No valid destination could be found for tag %s" % str(tag)
+  
+    return [rec_num, tag_num, tag]
+
+class RecordInfo(qdb.QDB):
+  """ Base class for retrieving data about tags in IPTC records. Derived
+      classes should implement the following lists:
+      - name : the names of the tags
+      - num  : the numbers of the tags
+      - count: the number of words every tag should occupy, with None
+                    to indicate that this is free
+      - type : the numbers of tag data types of the tags, as found in
+                iptcdatatypes.TYPES
+  """
+  
+  def getTagNum(self, tag):
+    """ Returns a tag number when fed a tag number or name, or None if it
+        doesn't exist within the current record. """
         
-      # Then we get the Pascal string, which we simply set to nothing
-      out_str += "\x00\x00"
-           
-      # Encode the length of the data
-      out_str += byteform.itob(tag.getDataLength(), 4, big_endian = self.big_endian)
-       
-      # And append the data itself
-      out_str += tag.getData()
+    ret = None
+    
+    if (type(tag) == types.IntType):
+      # We have a tag number as user input
+      if tag in self.num:
+        ret = tag
+    elif (type(tag) == types.StringType):
+      # We have a tag name, search the number for it
+      try:
+        ret = self.query("name", tag, "num")
+      except ValueError:
+        pass
+  
+    return ret
+
+  def getDataType(self, tag):
+    """ Return the data type for a certain tag (name or number). """
+    tag_num   = self.getTagNum(tag)
+    data_type = self.query("num", tag_num, "data_type")
+    return data_type
+
+  def getCount(self, tag):
+    """ Return the count for a certain tag (name or number), if any, or None
+        if otherwise. """
+    tag_num = self.getTagNum(tag)
+    return self.query("num", tag_num, "count")
+
+  def encode(self, tag, payload, big_endian = True):
+    """ Encode the data according to the specifications of the tag. """
+    
+    # Try to encode the tag
+    index = self.query("num", self.getTagNum(tag))
+    data_type = self.query(index, "data_type")
+    if (data_type != None):
+      data = self.DATA_TYPES[data_type].encode(payload, is_big_endian = big_endian)
+    else:
+      # If we don't have a data type, raise an error
+      raise "Setting tag %s is not implemented!" % str(tag)
+    
+    # Check for the proper length
+    
+    # Retrieve the allowed lengths
+    word_width = self.DATA_TYPES[data_type].word_width
+    count = self.query(index, "count")
+    if (type(count) == types.ListType):
+      min_length = count[0] * word_width
+      max_length = count[1] * word_width
+    else:
+      min_length = count * word_width
+      max_length = None
       
-    return out_str
-        
+    # Check lengths
+    if (len(data) < min_length):
+      # If data type is Digits, pad it with zeroes
+      if (data_type == 15):
+        data = (min_length - len(data)) * "0" + data
+    elif (max_length != None) and (len(data) > max_length):
+      raise "Encoded data takes %d bytes, while only %d bytes are allowed!" % (len(data), max_length)
+    
+    return data
+
+  def decode(self, tag, data, big_endian = True):
+    """ Encode the data according to the specifications of the tag. """
+    tag_num   = self.getTagNum(tag)
+    data_type = self.query("num", tag_num, "data_type")
+    payload   = iptcdatatypes.TYPES[data_type].decode(data, is_big_endian = big_endian)
+    return payload
+    
 class MetaInfoFile:
   """The base class for files containing meta information."""
   
   def __init__(self):
-    self.ifds = dict.fromkeys(["tiff", "exif", "gps"], None)
-    self.iptc_info = None
+    pass
+    #self.ifds = dict.fromkeys(["tiff", "exif", "gps"], None)
+    #self.iptc_info = None
 
   def getExifTagPayload(self, tag):
     """ Return the payload of a tag with the specified name. """
@@ -133,49 +273,14 @@ class MetaInfoFile:
           break
 
     return payload
-
-  def getExifBlock(self):
+    
+  def getExifBlob(self, offset = 0):
     """ Return the encoded Tiff, Exif and GPS IFD's as a block. """
     
-    # The exif data can have a different endianness than the JPEG file
-    ifd_big_endian = self.ifds["tiff"].big_endian
-          
-    # Calculate the different byte offsets (within the segment)
-    if "exif" in self.ifds:
-      exif_ifd_offset = self.ifds["tiff"].getSize() + 8 # 8 for Tiff header
+    if (self.exif):
+      return self.exif.getBlob(offset)
     else:
-      exif_ifd_offset = 0
-      
-    if "gps" in self.ifds:
-      gps_ifd_offset  = exif_ifd_offset + self.ifds["exif"].getSize()
-    else:
-      gps_ifd_offset = 0
-
-    if "interop" in self.ifds:
-      interop_ifd_offset  = gps_ifd_offset + self.ifds["gps"].getSize() # FIXME: If no GPS block is present, this will produce the wrong result. This is also the case for other parts
-    else:
-      interop_ifd_offset = 0
-      
-    # Set the offsets to the tiff data
-    if (exif_ifd_offset):
-      self.ifds["tiff"].setTagPayload("Exif IFD Pointer", exif_ifd_offset)
-    if (gps_ifd_offset):
-      self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", gps_ifd_offset)
-
-    # Set the offsets to the exif data. FIXME: Check for presence of Exif data first
-    if (interop_ifd_offset):
-      self.ifds["exif"].setTagPayload(40965, interop_ifd_offset)
-
-    # Write the Exif IFD's
-    byte_str = self.ifds["tiff"].getByteStream(8)
-    if ("exif" in self.ifds):
-      byte_str += self.ifds["exif"].getByteStream(exif_ifd_offset)
-    if ("gps" in self.ifds):
-      byte_str += self.ifds["gps"].getByteStream(gps_ifd_offset)
-    if ("interop" in self.ifds):
-      byte_str += self.ifds["interop"].getByteStream(interop_ifd_offset)
-      
-    return byte_str
+      return None
     
   def getIPTCBlock(self):
     """ Return the encoded IPTC data as a blcok. """

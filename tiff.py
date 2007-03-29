@@ -18,7 +18,7 @@
 # 
 
 # Import local classes
-import ifd, exif, iptc, metainfofile, byteform
+import ifd, exif, metainfofile, byteform, iptc
 
 # Import python modules
 import types
@@ -43,7 +43,8 @@ class Tiff(metainfofile.MetaInfoFile):
     self.parseFile(offset)
       
   def parseFile(self, offset):
-    """Parse the header of the Tiff file, starting ot the byte offset.""" 
+    """Parse the header of the Tiff file, starting ot the byte offset."""
+    
     is_tiff = False
     self.fp.seek(offset)
     
@@ -64,36 +65,29 @@ class Tiff(metainfofile.MetaInfoFile):
     if not(is_tiff):
       raise "File is not Tiff"
     
-    # Map all the IFD's
-    
-    # Get the first IFD (The "Tiff" tags)
-    ifd_offsets = {}
-    ifd_offsets["tiff"] = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
-    self.ifds["tiff"] = exif.TIFF(self.fp, ifd_offsets["tiff"], offset, self.big_endian)
-    
-    # Get the Exif tags
-    ifd_offsets["exif"] = self.ifds["tiff"].getTagPayload("Exif IFD Pointer")
-    if (ifd_offsets["exif"]):
-      self.ifds["exif"] = exif.Exif(self.fp, ifd_offsets["exif"], offset, self.big_endian)
-      # Get the Interoperability tags. FIXME: Is this always in the Exif IFD located?
-      ifd_offsets["interop"] = self.ifds["exif"].getTagPayload(40965)
-      if (ifd_offsets["interop"]):
-        self.ifds["interop"] = exif.GPS(self.fp, ifd_offsets["interop"], offset, self.big_endian)
-      
-    # Get the GPS tags
-    ifd_offsets["gps"] = self.ifds["tiff"].getTagPayload("GPSInfo IFD Pointer")
-    if (ifd_offsets["gps"]):
-      self.ifds["gps"] = exif.GPS(self.fp, ifd_offsets["gps"], offset, self.big_endian)
+    # Read the Exif data
+    exif_offset = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
+    self.exif   = exif.Exif(self.fp, exif_offset, offset, self.big_endian)
 
-    # Get the IPTC block. The payload isn't the position in the file, but
-    # rather the IPTC content. To let the IPTC class do its job, we feed it
-    # the position of the block.
-    if (33723 in self.ifds["tiff"].fields):
-      iptc_offset = self.ifds["tiff"].fields[33723].getDataOffset()
-      iptc_length = self.ifds["tiff"].fields[33723].getDataLength()
-      self.iptc_info = iptc.IPTC(self.fp, iptc_offset, iptc_length) 
-    else:
-      self.iptc_info = None
+    # Get the IPTC block. The paylaod should simply be the encoded IPTC data
+    # (datatype UNDEFINED or BYTE), but in reality it often is set as long,
+    # where the number points to the absolute offset in the file. We have to
+    # work around this restricition. (see http://www.awaresystems.be/imaging/tiff/tifftags/iptc.html
+    # for more information.
+    try:
+      iptc_tag = self.exif.records.query("num", 1, "record").fields[33723]
+      iptc_offset = iptc_tag.getDataOffset()
+      #iptc_length = iptc_tag.getDataLength()
+      self.iptc = iptc.IPTC(self.fp, iptc_offset) 
+    except KeyError:
+      self.iptc = iptc.IPTC()
+      
+##    if (33723 in self.ifds["tiff"].fields):
+##      iptc_offset = self.ifds["tiff"].fields[33723].getDataOffset()
+##      iptc_length = self.ifds["tiff"].fields[33723].getDataLength()
+##      self.iptc_info = iptc.IPTC(self.fp, iptc_offset, iptc_length) 
+##    else:
+##      self.iptc_info = None
       
     #self.fp.seek(self.ifd_offsets["ifd0"] + self.ifds["ifd0"].getSize())
     #data = convBytes2Int(self.fp.read(4))
@@ -111,48 +105,53 @@ class Tiff(metainfofile.MetaInfoFile):
     out_fp.write(byteform.itob(42, 2, big_endian = self.big_endian))
     out_fp.write(byteform.itob(8, 4, big_endian = self.big_endian))
     
-    # Restructure the metadata: TODO: IPTC
-    curr_offset = 8
-    if ("tiff" in self.ifds):
-      curr_offset += self.ifds["tiff"].getSize()
-    if ("exif" in self.ifds):
-      self.ifds["tiff"].setTagPayload("Exif IFD Pointer", curr_offset)
-      exif_ifd_offset = curr_offset
-      curr_offset += self.ifds["exif"].getSize()
-    if ("gps" in self.ifds):
-      self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", curr_offset)
-      gps_ifd_offset = curr_offset
-      curr_offset += self.ifds["gps"].getSize()
-    if ("interop" in self.ifds):
-      self.ifds["tiff"].setTagPayload(40965, curr_offset)
-      interop_ifd_offset = curr_offset
-      curr_offset += self.ifds["interop"].getSize()
+##    curr_offset = 8
+##    if ("tiff" in self.ifds):
+##      curr_offset += self.ifds["tiff"].getSize()
+##    if ("exif" in self.ifds):
+##      self.ifds["tiff"].setTagPayload("Exif IFD Pointer", curr_offset)
+##      exif_ifd_offset = curr_offset
+##      curr_offset += self.ifds["exif"].getSize()
+##    if ("gps" in self.ifds):
+##      self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", curr_offset)
+##      gps_ifd_offset = curr_offset
+##      curr_offset += self.ifds["gps"].getSize()
+##    if ("interop" in self.ifds):
+##      self.ifds["tiff"].setTagPayload(40965, curr_offset)
+##      interop_ifd_offset = curr_offset
+##      curr_offset += self.ifds["interop"].getSize()
+##
+##    # Save the old strip offsets before we overwrite it
+##    old_strip_offsets = self.ifds["tiff"].getTagPayload("StripOffsets")
+##    
+##    # Write the IFD's
+##    out_fp.write(self.ifds["tiff"].getByteStream(8))
+##    if ("exif" in self.ifds):
+##      out_fp.write(self.ifds["exif"].getByteStream(exif_ifd_offset))
+##    if ("gps" in self.ifds):
+##      out_fp.write(self.ifds["gps"].getByteStream(gps_ifd_offset))
+##    if ("interop" in self.ifds):
+##      out_fp.write(self.ifds["interop"].getByteStream(interop_ifd_offset))
 
+    # Embed the IPTC data
+    if (self.iptc):
+      self.exif.setTag(33723, self.iptc.getBlob(), record = 1)
+      
     # Save the old strip offsets before we overwrite it
-    old_strip_offsets = self.ifds["tiff"].getTagPayload("StripOffsets")
-    
-    # Restructure the image data
-    # FIXME: RowsPerStrip, StripOffsets, and StripByteCounts can be both of
-    # type Short and Long, thus occupying different sizes in the IFD. Since
-    # we're not altering image data, RowsPerStrip and StripByteCounts will
-    # remain the same. StripOffsets however, *might* change the datatype when
-    # a lot of metadata pushes it over the 65k limit. This should be accounted
-    # for.
-    strip_lengths = self.ifds["tiff"].getTagPayload("StripByteCounts")
+    old_strip_offsets = self.exif.getTag("StripOffsets")
+
+    # Restructure the Exif metadata: TODO: IPTC
+    curr_offset = self.exif.getSize() + 8    
+    tiff = self.exif.records.query("name", "tiff", "record")
+    strip_lengths = self.exif.getTag("StripByteCounts")
     new_strip_offsets = []
     for length in strip_lengths:
       new_strip_offsets.append(curr_offset)
       curr_offset += length
-    self.ifds["tiff"].setTagPayload("StripOffsets", new_strip_offsets)
+    self.exif.setTag("StripOffsets", new_strip_offsets)
 
-    # Write the IFD's
-    out_fp.write(self.ifds["tiff"].getByteStream(8))
-    if ("exif" in self.ifds):
-      out_fp.write(self.ifds["exif"].getByteStream(exif_ifd_offset))
-    if ("gps" in self.ifds):
-      out_fp.write(self.ifds["gps"].getByteStream(gps_ifd_offset))
-    if ("interop" in self.ifds):
-      out_fp.write(self.ifds["interop"].getByteStream(interop_ifd_offset))
+    # Write the Exif data
+    out_fp.write(self.getExifBlob(8))
     
     # Write the image data
     for strip_num in range(len(strip_lengths)):

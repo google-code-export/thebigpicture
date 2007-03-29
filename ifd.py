@@ -50,7 +50,7 @@ class Tag(datablock.DataBlock):
     """ Return the data type of the tag. """
     return self.data_type
       
-class IFD:
+class IFD(datablock.DataBlock):
   """An IFD (Image File Directory) represents an elementary data type in both a
   Tiff and an Exif file. It has a certain ifd_offset in the file. A
   header_offset may also be specified to determine the start of the enclosing,
@@ -61,10 +61,18 @@ class IFD:
   numerical values in the same order. The third array holds the number of all
   the required tags. """
   
-  def __init__(self, file_pointer, ifd_offset, header_offset = 0, big_endian = True):
-    self.fp            = file_pointer
+  def __init__(self, file_pointer = None, ifd_offset = None, header_offset = 0, data = None, big_endian = True):
+    base_kwargs = {}
+    if ((file_pointer) and (ifd_offset)):
+      base_kwargs["fp"]     = file_pointer
+      base_kwargs["offset"] = ifd_offset + header_offset
+    elif (data):
+      base_kwargs["data"] = data
+      
+    datablock.DataBlock.__init__(self, **base_kwargs)
+    
+    self.ifd_offset    = ifd_offset
     self.header_offset = header_offset
-    self.ifd_offset    = ifd_offset + self.header_offset
     self.big_endian    = big_endian
 
     # The fields dict stores all the tags read from disk and/or set by the user.
@@ -76,39 +84,44 @@ class IFD:
     
     # Go to the proper offset and read the first two bytes. They represent the
     # number of fields in the IFD
-    self.fp.seek(self.ifd_offset)
-    num_fields = byteform.btoi(self.fp.read(2), big_endian = self.big_endian)
+    if (self.getDataLength() > 0) or (self.getDataLength() == None): # Parse when there's data, or when data size is unknown
+      self.seek(0)
+      num_fields = byteform.btoi(self.read(2), big_endian = self.big_endian)
+  
+      for field_num in range(num_fields):
+        # Read the type of the tag (number), the way the payload is stored, and
+        # the length of the payload
+        tag_type    = byteform.btoi(self.read(2), big_endian = self.big_endian)
+        data_type   = byteform.btoi(self.read(2), big_endian = self.big_endian)
+        payload_len = byteform.btoi(self.read(4), big_endian = self.big_endian)
+  
+        # The word width (number of bytes to encode one "character") of the
+        # payload is determined by the data type. This needs to be multiplied by
+        # the number of characters to get the total number of bytes.
+        num_bytes = payload_len * ifddatatypes.TYPES[data_type].word_width
+          
+        # The next four bytes either encode an offset te where the payload can be
+        # found, or the payload itself if it fits in these four bytes.
+        if (num_bytes < 5):
+          payload_offset = self.tell() + self.header_offset
+          self.read(4)
+        else:
+          payload_offset = byteform.btoi(self.read(4), big_endian = self.big_endian) + self.header_offset - self.ifd_offset
 
-    for field_num in range(num_fields):
-      # Read the type of the tag (number), the way the payload is stored, and
-      # the length of the payload
-      tag_type    = byteform.btoi(self.fp.read(2), big_endian = self.big_endian)
-      data_type   = byteform.btoi(self.fp.read(2), big_endian = self.big_endian)
-      payload_len = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
+        # Store the tag
+        if (self.fp):
+          tag = Tag(self.fp, payload_offset + self.ifd_offset, num_bytes, data_type)
+        else:
+          tag = Tag(self.read(num_bytes, payload_offset + self.header_offset), data_type)
+        self.fields[tag_type] = tag
 
-      # The word width (number of bytes to encode one "character") of the
-      # payload is determined by the data type. This needs to be multiplied by
-      # the number of characters to get the total number of bytes.
-      num_bytes = payload_len * ifddatatypes.TYPES[data_type].word_width
-        
-      # The next four bytes either encode an offset te where the payload can be
-      # found, or the payload itself if it fits in these four bytes.
-      if (num_bytes < 5):
-        payload_offset = self.fp.tell() - self.header_offset
-        self.fp.read(4)
-      else:
-        payload_offset = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
-
-      # Store the tag
-      self.fields[tag_type] = Tag(self.fp, payload_offset + self.header_offset, num_bytes, data_type)
-
-  def getTagPayload(self, tag):
+  def getTagPayload(self, tag_num):
     """Returns the payload from a certain tag name or number."""
     
     # Get the tag number
-    tag_num = self.__getTagNum__(tag)
+    #tag_num = self.__getTagNum__(tag)
 
-    if ((tag_num) and (tag_num in self.fields)):
+    if (tag_num in self.fields):
       tag = self.fields[tag_num]
     else:
       # If the tag was not found, return False
@@ -126,45 +139,50 @@ class IFD:
     else:
       return payload
     
-  def setTagPayload(self, tag, payload):
+  def removeTag(self, tag_num):
+    """ Remove tag with the specified number. """
+    try:
+      del(self.fields[tag_num])
+    except KeyError:
+      pass
+    
+  def setTag(self, tag_num, payload):
     """Sets the payload for a certain tag num or tag name."""
-    
-    # Get the tag num for the tag
-    tag_num = self.__getTagNum__(tag)
-    
-    if (tag_num):
-      index = self.tag_nums.index(tag_num)
 
-      # Make sure the payload is in a sequence      
-      if (type(payload) not in [types.ListType, types.TupleType]):
-        payload = [payload]
-        
-      # Check if the supplied data is of correct length
-      req_count = self.data_counts[index]
-
-      if (req_count != None) and (req_count != -1):
-        if (len(payload) != req_count):
-          raise "Wrong number of arguments supplied for encoding this tag!"
+    # Get the index and check if we can set this tag
+    index = self.records.query("num", tag_num)
+    if (index is False):
+      raise KeyError, "Tag %d is not known in this IFD!" % tag_num
+    
+    # Make sure the payload is in a sequence      
+    if (type(payload) not in [types.ListType, types.TupleType]):
+      payload = [payload]
       
-      # Find out the data type for the tag num and make sure it's a list
-      data_types = self.data_types[index]
-      if (type(data_types) == types.IntType):
-        data_types = [data_types]
+    # Check if the supplied data is of correct length
+    count = self.records.query("num", tag_num, "count")
+    if (count != None) and (count != -1): # Unspecified or special
+      if (len(payload) != count):
+        raise "Wrong number of arguments supplied for encoding this tag!"
+    
+    # Find out the data type for the tag num and make sure it's a list
+    data_types = self.records.query("num", tag_num, "data_type")
+    if (type(data_types) == types.IntType):
+      data_types = [data_types]
+    
+    # Try to encode the data with each of the possible data types. Stop when
+    # we succeeded.
+    success = False
+    for data_type in data_types:
+      try:
+        data = ifddatatypes.TYPES[data_type].encode(payload, self.big_endian)
+        success = True
+      except:
+        pass
+      if (success):
+        break
       
-      # Try to encode the data with each of the possible data types. Stop when
-      # we succeeded.
-      success = False
-      for data_type in data_types:
-        try:
-          data = ifddatatypes.TYPES[data_type].encode(payload, self.big_endian)
-          success = True
-        except:
-          pass
-        if (success):
-          break
-        
-      # Set the used data type and payload
-      self.fields[tag_num] = Tag(data, data_type)
+    # Set the used data type and payload
+    self.fields[tag_num] = Tag(data, data_type)
 
   def getTagNums(self):
     """ Return a sorted list of set tag nums in this IFD. """
@@ -195,7 +213,7 @@ class IFD:
         size += num_bytes
     return size
     
-  def getByteStream(self, offset, next_ifd = 0):
+  def getBlob(self, offset, next_ifd = 0):
     """Returns the entry stream and the data stream for writing the IFD. offset
     is the offset to byte addresses specified in tghe IFD (usually the size of
     the TIFF header). next_ifd is the byte position for the next IFD, if any.
@@ -236,23 +254,40 @@ class IFD:
         
     return fields_stream + data_stream
     
-  def __getTagNum__(self, tag):
-    """ Find out if a tag name or number is known, and return its number or
-        False otherwise. """
+  def getTagNum(self, tag):
+    """ Returns the tag number of the requested tag name or number, or False
+        otherwise (it can be used both to request a tag number and to check
+        whether the record implements a tag. """
     
-    ret = False
-    
+    tag_num = False
     if (type(tag) == types.IntType):
-      # We have a tag number as user input
-      if tag in self.tag_nums:
-        ret = tag
-    elif (type(tag) == types.StringType):
-      # We have a tag name, search the number for it
-      try:
-        index = self.tag_names.index(tag)
-        ret = self.tag_nums[index]
-      except ValueError:
-        pass
-  
-    return ret
+      if (self.records.query("num", tag)):
+        tag_num = tag
+    else:
+      tag_num = self.records.query("name", tag, "num")
+    
+    return tag_num
+  def hasTags(self):
+    """ Return True if the IFD has tags set, or False if not. """
+    return (len(self.fields) > 0)
 
+##  def __getTagNum__(self, tag):
+##    """ Find out if a tag name or number is known, and return its number or
+##        False otherwise. """
+##    
+##    ret = False
+##    
+##    if (type(tag) == types.IntType):
+##      # We have a tag number as user input
+##      if tag in self.tag_nums:
+##        ret = tag
+##    elif (type(tag) == types.StringType):
+##      # We have a tag name, search the number for it
+##      try:
+##        index = self.tag_names.index(tag)
+##        ret = self.tag_nums[index]
+##      except ValueError:
+##        pass
+##  
+##    return ret
+##
