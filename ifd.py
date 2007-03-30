@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import types, byteform, ifddatatypes, datablock
+import types, byteform, ifddatatypes, datablock, metainfofile
 
 class Tag(datablock.DataBlock):
   """ An IFD tag. """
@@ -50,7 +50,7 @@ class Tag(datablock.DataBlock):
     """ Return the data type of the tag. """
     return self.data_type
       
-class IFD(datablock.DataBlock):
+class IFD(metainfofile.MetaInfoRecord):
   """An IFD (Image File Directory) represents an elementary data type in both a
   Tiff and an Exif file. It has a certain ifd_offset in the file. A
   header_offset may also be specified to determine the start of the enclosing,
@@ -183,13 +183,6 @@ class IFD(datablock.DataBlock):
       
     # Set the used data type and payload
     self.fields[tag_num] = Tag(data, data_type)
-
-  def getTagNums(self):
-    """ Return a sorted list of set tag nums in this IFD. """
-    
-    tag_nums = self.fields.keys()
-    tag_nums.sort()
-    return tag_nums
     
   def getSize(self):
     """ Calculate the byte size of the IFD. """
@@ -254,23 +247,6 @@ class IFD(datablock.DataBlock):
         
     return fields_stream + data_stream
     
-  def getTagNum(self, tag):
-    """ Returns the tag number of the requested tag name or number, or False
-        otherwise (it can be used both to request a tag number and to check
-        whether the record implements a tag. """
-    
-    tag_num = False
-    if (type(tag) == types.IntType):
-      if (self.records.query("num", tag)):
-        tag_num = tag
-    else:
-      tag_num = self.records.query("name", tag, "num")
-    
-    return tag_num
-  def hasTags(self):
-    """ Return True if the IFD has tags set, or False if not. """
-    return (len(self.fields) > 0)
-
 ##  def __getTagNum__(self, tag):
 ##    """ Find out if a tag name or number is known, and return its number or
 ##        False otherwise. """

@@ -19,7 +19,7 @@
 
 import datablock, byteform, types, iptcdatatypes, qdb, metainfofile
 
-class IPTCRecord(datablock.DataBlock):
+class IPTCRecord(metainfofile.MetaInfoRecord):
   """ Base class for retrieving data about tags in IPTC records. Derived
       classes should implement the following lists:
       - name : the names of the tags
@@ -88,13 +88,6 @@ class IPTCRecord(datablock.DataBlock):
     else:
       self.fields[tag_num].append(self.__getTagObj__(tag_num, payload))
       
-  def getTagNums(self):
-    """ Return a sorted list of set tag nums in this IFD. """
-    
-    tag_nums = self.fields.keys()
-    tag_nums.sort()
-    return tag_nums
-
   def getBlob(self):
     """ Return a binary string representing the IPTC record. """
     
@@ -113,20 +106,7 @@ class IPTCRecord(datablock.DataBlock):
         data_str += tag.getData()
         
     return data_str
-    
-  def getTagNum(self, tag):
-    """ Returns a tag number when fed a tag number or name, or False if it
-        doesn't exist within the current record. """
-        
-    tag_num = False
-    if (type(tag) == types.IntType):
-      if (self.record.query("num", tag)):
-        tag_num = tag
-    else:
-      tag_num = self.records.query("name", tag, "num")
-      
-    return tag_num
-      
+
   def __getTagObj__(self, tag_num, payload):
     """ Helper method to prepare a tag object for setTag and appendTag. """
     
@@ -136,7 +116,7 @@ class IPTCRecord(datablock.DataBlock):
       raise KeyError, "Tag %d is not known in this IFD!" % tag_num
         
     # Find out the data type for the tag num and make sure it's a list
-    data_type = self.records.query("num", tag_num, "data_type")
+    data_type = self.records.query(index, "data_type")
     
     # Retrieve the allowed lengths
     count = self.records.query(index, "count")
@@ -160,12 +140,7 @@ class IPTCRecord(datablock.DataBlock):
       word_width = iptcdatatypes.TYPES[data_type].word_width
       data = ((min_count * word_width) - len(data)) * "0" + data
       
-    return datablock.DataBlock(data = data)
-  def hasTags(self):
-    """ Return True if the IFD has tags set, or False if not. """
-    
-    return (len(self.fields) > 0)
-    
+    return datablock.DataBlock(data = data)    
 ##class TagList:
 ##  """ Manage lists of IPTC tags within a record. IPTC blocks can have multiple
 ##      tags with the same number. """
@@ -237,7 +212,7 @@ class IPTCRecord(datablock.DataBlock):
 
 class IPTCEnvelope(IPTCRecord):
   RECORD_NUM = 1
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", ["EnvelopeRecordVersion", "Destination", "FileFormat", "FileVersion", "ServiceIdentifier", "EnvelopeNumber", "ProductID", "EnvelopePriority", "DateSent", "TimeSent", "CodedCharacterSet", "UniqueObjectName", "ARMIdentifier", "ARMVersion"])
   records.addList("num", [0, 5, 20, 22, 30, 40, 50, 60, 70, 80, 90, 100, 120, 122])
   records.addList("count", [1, 1, 1, 1, [0, 10], 8, [0, 32], 1, 8, 11, [0.32], [14, 80], 1, 1])
@@ -245,7 +220,7 @@ class IPTCEnvelope(IPTCRecord):
 
 class IPTCApplication(IPTCRecord):
   RECORD_NUM = 2
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", ["ApplicationRecordVersion","ObjectTypeReference","ObjectAttributeReference","ObjectName","EditStatus","EditorialUpdate","Urgency","SubjectReference","Category","SupplementalCategories","FixtureIdentifier","Keywords","ContentLocationCode","ContentLocationName","ReleaseDate","ReleaseTime","ExpirationDate","ExpirationTime","SpecialInstructions","ActionAdvised","ReferenceService","ReferenceDate","ReferenceNumber","DateCreated","TimeCreated","DigitalCreationDate","DigitalCreationTime","OriginatingProgram","ProgramVersion","ObjectCycle","By-line","By-lineTitle","City","Sub-location","Province-State","Country-PrimaryLocationCode","Country-PrimaryLocationName","OriginalTransmissionReference","Headline","Credit","Source","CopyrightNotice","Contact","Caption-Abstract","LocalCaption","Writer-Editor","RasterizedCaption","ImageType","ImageOrientation","LanguageIdentifier","AudioType","AudioSamplingRate","AudioSamplingResolution","AudioDuration","AudioOutcue","JobID","MasterDocumentID","ShortDocumentID","UniqueDocumentID","OwnerID","ObjectPreviewFileFormat","ObjectPreviewFileVersion","ObjectPreviewData","ClassifyState","SimilarityIndex","DocumentNotes","DocumentHistory","ExifCameraInfo"])
   records.addList("num", [0, 3, 4, 5, 7, 8, 10, 12, 15, 20, 22, 25, 26, 27, 30, 35, 37, 38, 40, 42, 45, 47, 50, 55, 60, 62, 63, 65, 70, 75, 80, 85, 90, 92, 95, 100, 101, 103, 105, 110, 115, 116, 118, 120, 121, 122, 125, 130, 131, 135, 150, 151, 152, 153, 154, 184, 185, 186, 187, 188, 200, 201, 202, 225, 228, 230, 231, 232])
   records.addList("count", [1, [3, 67], [4, 68], [0, 64], [0, 64], 2, 1, [13, 236], [0, 3], [0, 32], [0, 32], [0, 64], 3, [0, 64], 8, 11, 8, 11, [0, 256], 2, [0, 10], 8, 8, 8, 11, 8, 11, [0, 32], [0, 10], 1, [0, 32], [0, 32], [0, 32], [0, 32], [0, 32], 3, [0, 64], [0, 32], [0, 256], [0, 32], [0, 32], [0, 128], [0, 128], [0, 2000], [0, 256], [0, 32], 7360, 2, 1, [2, 3], 2, 6, 2, 6, [0, 64], [0, 64], [0, 256], [0, 64], [0, 128], [0, 128], 0, 1, [0, 256000], [0, 64], [0, 32], [0, 1024], [0, 256], [0, 4096]])
@@ -253,7 +228,7 @@ class IPTCApplication(IPTCRecord):
   
 class IPTCNewsPhoto(IPTCRecord):
   RECORD_NUM = 3
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", ["NewsPhotoVersion","IPTCPictureNumber","IPTCImageWidth","IPTCImageHeight","IPTCPixelWidth","IPTCPixelHeight","SupplementalType","ColorRepresentation","InterchangeColorSpace","ColorSequence","ICC_Profile","ColorCalibrationMatrix","LookupTable","NumIndexEntries","ColorPalette","IPTCBitsPerSample","SampleStructure","ScanningDirection","IPTCImageRotation","DataCompressionMethod","QuantizationMethod","EndPoints","ExcursionTolerance","BitsPerComponent","MaximumDensityRange","GammaCompensatedValue"])
   records.addList("num", [0, 10, 20, 30, 40, 50, 55, 60, 64, 65, 66, 70, 80, 84, 85, 86, 90, 100, 102, 110, 120, 125, 130, 135, 140, 145])
   records.addList("count", [1, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
@@ -261,7 +236,7 @@ class IPTCNewsPhoto(IPTCRecord):
   
 class IPTCPreObjectData(IPTCRecord):
   RECORD_NUM = 7
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", ["SizeMode", "MaxSubfileSize", "ObjectSizeAnnounced", "MaximumObjectSize"])
   records.addList("num", [10, 20, 90, 95])
   records.addList("count", [None, None, None, None])
@@ -269,7 +244,7 @@ class IPTCPreObjectData(IPTCRecord):
   
 class IPTCObjectData(IPTCRecord):
   RECORD_NUM = 8
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", ["SubFile"])
   records.addList("num", [10])
   records.addList("count", [None])
@@ -277,7 +252,7 @@ class IPTCObjectData(IPTCRecord):
   
 class IPTCPostObjectData(IPTCRecord):
   RECORD_NUM = 9
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", ["ConfirmedObjectSize"])
   records.addList("num", [10])
   records.addList("count", [None])

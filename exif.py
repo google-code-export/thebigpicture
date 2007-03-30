@@ -95,7 +95,7 @@ import metainfofile, ifd, qdb, ifddatatypes
 
 # The Tiff IFD (first part off IFD0 in Tiff file).
 class TiffIFD(ifd.IFD):
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   # This info is taken from the Exif 2.2 specification, page 54
   records.addList("name",      ["ImageWidth", "ImageLength", "BitsPerSample", "Compression", "PhotometricInterpretation", "ImageDescription", "Make", "Model", "StripOffsets", "Orientation", "SamplesPerPixel", "RowsPerStrip", "StripByteCounts", "XResolution", "YResolution", "PlanarConfiguration", "ResolutionUnit", "TransferFunction", "Software", "DateTime", "Artist", "WhitePoint", "PrimaryChromaticities", "JPEGInterchangeFormat", "JPEGInterchangeFormatLength", "YCbCrCoefficients", "YCbCrSubSampling", "YCbCrPositioning", "ReferenceBlackWhite", "IPTC-NAA", "Copyright", "Exif IFD Pointer", "GPSInfo IFD Pointer"])
   records.addList("num",       [256, 257, 258, 259, 262, 270, 271, 272, 273, 274, 277, 278, 279, 282, 283, 284, 296, 301, 305, 306, 315, 318, 319, 513, 514, 529, 530, 531, 532, 33723, 33432, 34665, 34853])
@@ -106,7 +106,7 @@ class TiffIFD(ifd.IFD):
 
 class ExifIFD(ifd.IFD):
   # The Exif data.
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   # This info is taken from the Exif 2.2 specification, page 24 and 25 (with the
   # exception of the Interoperability IFD Pointer
   records.addList("name",      ["ExposureTime", "FNumber", "ExposureProgram", "SpectralSensitivity", "ISOSpeedRatings", "OECF", "ExifVersion", "DateTimeOriginal", "DateTimeDigitized", "ComponentsConfiguration", "CompressedBitsPerPixel", "ShutterSpeedValue", "ApertureValue", "BrightnessValue", "ExposureBiasValue", "MaxApertureValue", "SubjectDistance", "MeteringMode", "LightSource", "Flash", "FocalLength", "SubjectArea", "MakerNote", "UserComment", "SubSecTime", "SubSecTimeOriginal", "SubSecTimeDigitized", "FlashpixVersion", "ColorSpace", "PixelXDimension", "PixelYDimension", "RelatedSoundFile", "Interoperability IFD Pointer", "FlashEnergy", "SpatialFrequencyResponse", "FocalPlaneXResolution", "FocalPlaneYResolution", "FocalPlaneResolutionUnit", "SubjectLocation", "ExposureIndex", "SensingMethod", "FileSource", "SceneType", "CFAPattern", "CustomRendered", "ExposureMode", "WhiteBalance", "DigitalZoomRatio", "FocalLengthIn35mmFilm", "SceneCaptureType", "GainControl", "Contrast", "Saturation", "Sharpness", "DeviceSettingDescription", "SubjectDistanceRange", "ImageUniqueID"])
@@ -116,7 +116,7 @@ class ExifIFD(ifd.IFD):
 
 class GPSIFD(ifd.IFD):
   # The GPS data.
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   # This info is taken from the Exif 2.2 specification, page 46
   records.addList("name",      ["GPSVersionID", "GPSLatitudeRef", "GPSLatitude", "GPSLongitudeRef", "GPSLongitude", "GPSAltitudeRef", "GPSAltitude", "GPSTimeStamp", "GPSSatellites", "GPSStatus", "GPSMeasureMode", "GPSDOP", "GPSSpeedRef", "GPSSpeed", "GPSTrackRef", "GPSTrack", "GPSImgDirectionRef", "GPSImgDirection", "GPSMapDatum", "GPSDestLatitudeRef", "GPSDestLatitude", "GPSDestLongitudeRef", "GPSDestLongitude", "GPSDestBearingRef", "GPSDestBearing", "GPSDestDistanceRef", "GPSDestDistance", "GPSProcessingMethod", "GPSAreaInformation", "GPSDateStamp", "GPSDifferential"])
   records.addList("num",       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30])
@@ -125,7 +125,7 @@ class GPSIFD(ifd.IFD):
   #  required  = []
 
 class InteropIFD(ifd.IFD):
-  records = metainfofile.RecordInfo()
+  records = qdb.QDB()
   records.addList("name", [])
   records.addList("num", [])
   records.addList("data_type", [])
