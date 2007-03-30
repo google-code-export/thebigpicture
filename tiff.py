@@ -18,7 +18,7 @@
 # 
 
 # Import local classes
-import ifd, exif, metainfofile, byteform, iptc
+import ifd, exif, metainfofile, byteform, iptcnaa
 
 # Import python modules
 import types
@@ -78,9 +78,9 @@ class Tiff(metainfofile.MetaInfoFile):
       iptc_tag = self.exif.records.query("num", 1, "record").fields[33723]
       iptc_offset = iptc_tag.getDataOffset()
       #iptc_length = iptc_tag.getDataLength()
-      self.iptc = iptc.IPTC(self.fp, iptc_offset) 
+      self.iptc = iptcnaa.IPTC(self.fp, iptc_offset) 
     except KeyError:
-      self.iptc = iptc.IPTC()
+      self.iptc = iptcnaa.IPTC()
       
 ##    if (33723 in self.ifds["tiff"].fields):
 ##      iptc_offset = self.ifds["tiff"].fields[33723].getDataOffset()

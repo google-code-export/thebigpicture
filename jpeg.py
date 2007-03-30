@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import exif, tiff, metainfofile, byteform, datablock, iptc, photoshop
+import exif, tiff, metainfofile, byteform, datablock, iptcnaa, photoshop
 
 import types
 
@@ -226,7 +226,7 @@ class JPEG(metainfofile.MetaInfoFile):
           if (1028 in ps.tags):
             self.iptc_segment = seg
             self.ps_info      = ps
-            self.iptc = iptc.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
+            self.iptc = iptcnaa.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
   
   def writeFile(self, file_path):
     # Open the new file for writing

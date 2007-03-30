@@ -19,7 +19,7 @@
 
 import byteform, datablock, qdb, types
    
-class MetaInfoBlock(datablock.DataBlock):
+class MetaInfoBlock:
   """ The base class for a particuler kind of metainformation structure, like
       Exif or IPTC info. This class provides the methods for searching over the
       different records for a specific tag. """

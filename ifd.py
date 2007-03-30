@@ -17,8 +17,66 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import types, byteform, ifddatatypes, datablock, metainfofile
+# Import standard Python modules
+import types
+# Import custom modules
+import byteform, datablock, datatypes, metainfofile
 
+# === Stuff relating to the IFD data types ===
+class Ascii(datatypes.DataType):
+  """ In exif, strings are capped with a zero byte, and a byte stream may
+      contain multiple strings. """
+  word_width = 1
+  
+  @classmethod
+  def encode(cls, streams, is_big_endian = True):
+    """ Encode either a string or a list of strings to ASCII data. The
+    is_big_endian parameter is only here for compatibility reasons. """
+    
+    # If the user passed a string, put it in a list for easier handling
+    if (type(streams) == types.StringType):
+      streams = [streams]
+      
+    # Iterate over the strings and put a null character at each end
+    byte_stream = ""
+    for stream in streams:
+      byte_stream += stream + "\x00"
+      
+    return byte_stream
+    
+  @classmethod
+  def decode(cls, byte_stream, is_big_endian = True):
+    """ Convert a byte stream to a list of strings. The is_big_endian parameter
+        is only here for compatibility reasons. """
+        
+    streams = []
+    
+    # Iterate over all the characters in the byte stream, and start a new string
+    # at every null character
+    for char in byte_stream:
+      if (char == "\x00"):
+        streams.append("")
+      else:
+        streams[-1] += char
+        
+    return streams
+    
+DATA_TYPES = {
+  1: datatypes.Byte,
+  2: Ascii,
+  3: datatypes.Short,
+  4: datatypes.Long,
+  5: datatypes.Rational,
+  6: datatypes.SByte,
+  7: datatypes.Undefined,
+  8: datatypes.SShort,
+  9: datatypes.SLong,
+  10: datatypes.SRational,
+  11: datatypes.Float,
+  12: datatypes.Double
+} 
+
+# === Stuff relating to the IFD structure ===
 class Tag(datablock.DataBlock):
   """ An IFD tag. """
       
@@ -98,7 +156,7 @@ class IFD(metainfofile.MetaInfoRecord):
         # The word width (number of bytes to encode one "character") of the
         # payload is determined by the data type. This needs to be multiplied by
         # the number of characters to get the total number of bytes.
-        num_bytes = payload_len * ifddatatypes.TYPES[data_type].word_width
+        num_bytes = payload_len * DATA_TYPES[data_type].word_width
           
         # The next four bytes either encode an offset te where the payload can be
         # found, or the payload itself if it fits in these four bytes.
@@ -130,7 +188,7 @@ class IFD(metainfofile.MetaInfoRecord):
     # Decipher the relevant info
     data_type = tag.getDataType()
     data      = tag.getData()
-    payload   = ifddatatypes.TYPES[data_type].decode(data, self.big_endian)
+    payload   = DATA_TYPES[data_type].decode(data, self.big_endian)
 
     # If the data is a single value, return it as such, otherwise, return a
     # list
@@ -174,7 +232,7 @@ class IFD(metainfofile.MetaInfoRecord):
     success = False
     for data_type in data_types:
       try:
-        data = ifddatatypes.TYPES[data_type].encode(payload, self.big_endian)
+        data = DATA_TYPES[data_type].encode(payload, self.big_endian)
         success = True
       except:
         pass
@@ -231,7 +289,7 @@ class IFD(metainfofile.MetaInfoRecord):
       tag       = self.fields[tag_num]
       data_type = tag.getDataType()
       data      = tag.getData()
-      count     = len(data) / ifddatatypes.TYPES[data_type].word_width
+      count     = len(data) / DATA_TYPES[data_type].word_width
         
       # Construct the field
       fields_stream += byteform.itob(tag_num, 2, big_endian = self.big_endian)
@@ -247,23 +305,3 @@ class IFD(metainfofile.MetaInfoRecord):
         
     return fields_stream + data_stream
     
-##  def __getTagNum__(self, tag):
-##    """ Find out if a tag name or number is known, and return its number or
-##        False otherwise. """
-##    
-##    ret = False
-##    
-##    if (type(tag) == types.IntType):
-##      # We have a tag number as user input
-##      if tag in self.tag_nums:
-##        ret = tag
-##    elif (type(tag) == types.StringType):
-##      # We have a tag name, search the number for it
-##      try:
-##        index = self.tag_names.index(tag)
-##        ret = self.tag_nums[index]
-##      except ValueError:
-##        pass
-##  
-##    return ret
-##
