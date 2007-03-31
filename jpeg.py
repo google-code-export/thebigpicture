@@ -17,8 +17,9 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
+# Import the custom modules
 import exif, tiff, metainfofile, byteform, datablock, iptcnaa, photoshop
-
+# Import standard Python modules
 import types
 
 # JPEG files are divided in several segments, each starting with \xff, followed
@@ -132,7 +133,7 @@ class Segment(datablock.DataBlock):
   def getNumber(self):
     return self.number
     
-  def getSegment(self):
+  def getBlob(self):
     """ Return the complete segment, including headers. """
     
     byte_str = "\xff" + chr(self.number)
@@ -213,13 +214,12 @@ class JPEG(metainfofile.MetaInfoFile):
         self.exif_segment = seg
         tiff_block = tiff.Tiff(self.fp, seg.getDataOffset() + 6) # 6 bytes Exif marker
         self.exif = tiff_block.exif
-        #self.iptc = tiff_block.iptc
+        self.iptc = tiff_block.iptc
         break
 
     # If the IPTC info wasn't encoded in the Tiff IFD, we can look for it in
     # APP13 (Photoshop data) (0xED)
-    self.iptc = None
-    if (not self.iptc): # FIXME: This does not work anymore, an IPTC objext is always created
+    if (not self.iptc.hasTags()):
       for seg in self.segments[SEG_NUMS["APP13"]]:
         if (seg.read(14, 0) == "Photoshop 3.0\x00"):
           ps = photoshop.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
@@ -245,17 +245,20 @@ class JPEG(metainfofile.MetaInfoFile):
       byte_str += "\x49\x49"
     byte_str += byteform.itob(42, 2, big_endian = ifd_big_endian)
     byte_str += byteform.itob(8, 4, big_endian = ifd_big_endian)
+    
+    # Write the Exif data
     byte_str += self.getExifBlob(8)
     
-    # Put the Exif data into an appropriate APP1 segment.  FIXME: This
-    # invalidates that segment for feature data extraction.
-    #if (not self.exif_segment):
-    #  self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
-    #  self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
-    #else:
-    self.exif_segment.setData(byte_str)
+    # Put the Exif data into an appropriate APP1 segment. FIXME: This
+    # invalidates that segment for future data extraction.
+    if (not self.exif_segment):
+      self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
+      self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
+    else:
+      self.exif_segment.setData(byte_str)
     
-    # Prepare the IPTC segment for writing
+    # Prepare the IPTC segment for writing. FIXME: This
+    # invalidates that segment for future data extraction.
     self.ps_info.setTag(1028, self.iptc.getBlob())
     self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
     
@@ -264,9 +267,8 @@ class JPEG(metainfofile.MetaInfoFile):
     for seg_type in SEGMENTS:
       seg_num = SEG_NUMS[seg_type]
       for segment in self.segments[seg_num]:
-        #print seg_num, segment.number
-        # Write the start of the segment
-        out_fp.write(segment.getSegment())
+        # Write the segment
+        out_fp.write(segment.getBlob())
         
     # Write the image data, which starts after the SOS segment
     segment = self.segments[SEG_NUMS["SOS"]][-1]
@@ -293,6 +295,7 @@ class JPEG(metainfofile.MetaInfoFile):
   def setComment(self, comment, append = False):
     """ Set the JPEG comment. If append is True, the comment will be recorded as
         an additional COM segment. """
+        
     segment = Segment(SEG_NUMS["COM"], comment)
     if (append):
       self.segments[SEG_NUMS["COM"]].append(segment)

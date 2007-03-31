@@ -78,8 +78,9 @@ DATA_TYPES = {
 
 # === Stuff relating to the IFD structure ===
 class Tag(datablock.DataBlock):
-  """ An IFD tag. """
-      
+  """ An IFD tag. It is basically a DataBlock with a data type associated, since
+      IFD tags may sometimes be encoded with differing data types. """
+  
   def __init__(self, *args):
     """ Initialize either with file pointer, offset, length, and data type, or
         the encoded content and data type. """
@@ -95,7 +96,7 @@ class Tag(datablock.DataBlock):
       base_kwargs["offset"] = args[1]
       base_kwargs["length"] = args[2]
     else:
-      raise "Wrong initialization of Exif tag!"
+      raise TypeError, "Wrong initialization of Exif tag!"
       
     # The data type is always the last argument
     self.data_type = args[-1]
@@ -113,13 +114,16 @@ class IFD(metainfofile.MetaInfoRecord):
   Tiff and an Exif file. It has a certain ifd_offset in the file. A
   header_offset may also be specified to determine the start of the enclosing,
   larger part (APP1 for example). Offsets in an IFD are measured from this
-  number. This class functions as a base class. Derived classes need to specify
-  the arrays tag_names, tag_nums and required_tags. The first is an array with
-  the string representation of the names of the tags, the second one holds the
-  numerical values in the same order. The third array holds the number of all
-  the required tags. """
+  number. This class functions as a base class.
+  Derived classes need to specify a QDB called tags, which holds the names,
+  numbers, data types and counts for each tag. """
+
+  # The data types we know of
+  DATA_TYPES = DATA_TYPES
   
   def __init__(self, file_pointer = None, ifd_offset = None, header_offset = 0, data = None, big_endian = True):
+    
+    # Construct the arguments for the base class
     base_kwargs = {}
     if ((file_pointer) and (ifd_offset)):
       base_kwargs["fp"]     = file_pointer
@@ -127,8 +131,10 @@ class IFD(metainfofile.MetaInfoRecord):
     elif (data):
       base_kwargs["data"] = data
       
-    datablock.DataBlock.__init__(self, **base_kwargs)
+    # Call the base class
+    metainfofile.MetaInfoRecord.__init__(self, **base_kwargs)
     
+    # Store the data relevant to this class
     self.ifd_offset    = ifd_offset
     self.header_offset = header_offset
     self.big_endian    = big_endian
@@ -173,12 +179,9 @@ class IFD(metainfofile.MetaInfoRecord):
           tag = Tag(self.read(num_bytes, payload_offset + self.header_offset), data_type)
         self.fields[tag_type] = tag
 
-  def getTagPayload(self, tag_num):
-    """Returns the payload from a certain tag name or number."""
+  def getTag(self, tag_num):
+    """Returns the payload from a certain tag number."""
     
-    # Get the tag number
-    #tag_num = self.__getTagNum__(tag)
-
     if (tag_num in self.fields):
       tag = self.fields[tag_num]
     else:
@@ -188,7 +191,7 @@ class IFD(metainfofile.MetaInfoRecord):
     # Decipher the relevant info
     data_type = tag.getDataType()
     data      = tag.getData()
-    payload   = DATA_TYPES[data_type].decode(data, self.big_endian)
+    payload   = self.DATA_TYPES[data_type].decode(data, self.big_endian)
 
     # If the data is a single value, return it as such, otherwise, return a
     # list
@@ -196,19 +199,12 @@ class IFD(metainfofile.MetaInfoRecord):
       return payload[0]
     else:
       return payload
-    
-  def removeTag(self, tag_num):
-    """ Remove tag with the specified number. """
-    try:
-      del(self.fields[tag_num])
-    except KeyError:
-      pass
-    
+
   def setTag(self, tag_num, payload):
     """Sets the payload for a certain tag num or tag name."""
 
     # Get the index and check if we can set this tag
-    index = self.records.query("num", tag_num)
+    index = self.tags.query("num", tag_num)
     if (index is False):
       raise KeyError, "Tag %d is not known in this IFD!" % tag_num
     
@@ -217,13 +213,13 @@ class IFD(metainfofile.MetaInfoRecord):
       payload = [payload]
       
     # Check if the supplied data is of correct length
-    count = self.records.query("num", tag_num, "count")
+    count = self.tags.query("num", tag_num, "count")
     if (count != None) and (count != -1): # Unspecified or special
       if (len(payload) != count):
         raise "Wrong number of arguments supplied for encoding this tag!"
     
     # Find out the data type for the tag num and make sure it's a list
-    data_types = self.records.query("num", tag_num, "data_type")
+    data_types = self.tags.query("num", tag_num, "data_type")
     if (type(data_types) == types.IntType):
       data_types = [data_types]
     
@@ -241,28 +237,39 @@ class IFD(metainfofile.MetaInfoRecord):
       
     # Set the used data type and payload
     self.fields[tag_num] = Tag(data, data_type)
+
+  def removeTag(self, tag_num):
+    """ Remove tag with the specified number. """
+    try:
+      del(self.fields[tag_num])
+    except KeyError:
+      pass
     
   def getSize(self):
     """ Calculate the byte size of the IFD. """
     
-    tag_nums = self.fields.keys()
-    
-    # An IFD always needs 2 bytes at the start to specify the number of fields,
-    # and 4 bytes between the fields and the data for the byte offset to the
-    # next IFD
-    size = 6
-    
-    # For each field, we need 12 bytes
-    size += 12 * len(tag_nums)
-
-    # For each field with a data block larger than four bytes, we need to add
-    # the size of the data field
-    for tag_num in tag_nums:
-      tag       = self.fields[tag_num]
-      num_bytes = tag.getDataLength()
-      if (num_bytes > 4):
-        size += num_bytes
-    return size
+    if not (self.hasTags()):
+      # If we don't have any tags, length is zero
+      return 0
+    else:
+      tag_nums = self.fields.keys()
+      
+      # An IFD always needs 2 bytes at the start to specify the number of fields,
+      # and 4 bytes between the fields and the data for the byte offset to the
+      # next IFD
+      size = 6
+      
+      # For each field, we need 12 bytes
+      size += 12 * len(tag_nums)
+  
+      # For each field with a data block larger than four bytes, we need to add
+      # the size of the data field
+      for tag_num in tag_nums:
+        tag       = self.fields[tag_num]
+        num_bytes = tag.getDataLength()
+        if (num_bytes > 4):
+          size += num_bytes
+      return size
     
   def getBlob(self, offset, next_ifd = 0):
     """Returns the entry stream and the data stream for writing the IFD. offset
@@ -270,38 +277,44 @@ class IFD(metainfofile.MetaInfoRecord):
     the TIFF header). next_ifd is the byte position for the next IFD, if any.
     """
     
-    tag_nums = self.getTagNums()
-
-    # Calculate the offset at which we may write data (after the offset, 2 bytes
-    # at the start of the IFD, 12 bytes for each field, and four bytes as
-    # pointer to the next IFD
-    data_offset = offset + 12 * len(tag_nums) + 6
-   
-    # For writing the data, we split the stream in two; one part contains the
-    # 12-byte fields specifying tags, data type, etc. and the other one contains
-    # the encoded data (which is over 4 bytes in size). At the end, these two
-    # fields will be concatenated
-    fields_stream = byteform.itob(len(tag_nums), 2, big_endian = self.big_endian)
-    data_stream   = byteform.itob(next_ifd, 4, big_endian = self.big_endian)
-    
-    # Write each tag
-    for tag_num in tag_nums:
-      tag       = self.fields[tag_num]
-      data_type = tag.getDataType()
-      data      = tag.getData()
-      count     = len(data) / DATA_TYPES[data_type].word_width
+    if not (self.hasTags()):
+      # If we don't have any tags, simply return nothing
+      return None
+    else:
+      tag_nums = self.getTagNums()
+  
+      # Calculate the offset at which we may write data (after the offset, 2 bytes
+      # at the start of the IFD, 12 bytes for each field, and four bytes as
+      # pointer to the next IFD
+      data_offset = offset + 12 * len(tag_nums) + 6
+     
+      # For writing the data, we split the stream in two; one part contains the
+      # 12-byte fields specifying tags, data type, etc. and the other one contains
+      # the encoded data (which is over 4 bytes in size). At the end, these two
+      # fields will be concatenated
+      fields_stream = byteform.itob(len(tag_nums), 2, big_endian = self.big_endian)
+      data_stream   = byteform.itob(next_ifd, 4, big_endian = self.big_endian)
+      
+      # Write each tag
+      for tag_num in tag_nums:
+        tag       = self.fields[tag_num]
+        data_type = tag.getDataType()
+        data      = tag.getData()
+        count     = len(data) / DATA_TYPES[data_type].word_width
+          
+        # Write the tag number, data type and data count
+        fields_stream += byteform.itob(tag_num, 2, big_endian = self.big_endian)
+        fields_stream += byteform.itob(data_type, 2, big_endian = self.big_endian)
+        fields_stream += byteform.itob(count, 4, big_endian = self.big_endian)
         
-      # Construct the field
-      fields_stream += byteform.itob(tag_num, 2, big_endian = self.big_endian)
-      fields_stream += byteform.itob(data_type, 2, big_endian = self.big_endian)
-      fields_stream += byteform.itob(count, 4, big_endian = self.big_endian)
-      if (len(data) <= 4):
-        fields_stream += data
-        fields_stream += (4 - len(data)) * "\x00"
-      else:
-        fields_stream += byteform.itob(data_offset, 4, big_endian = self.big_endian)
-        data_stream   += data
-        data_offset   += len(data)
-        
-    return fields_stream + data_stream
-    
+        # If we can fit the data into four bytes, do so, otherwise write it in
+        # the data field and store the offset
+        if (len(data) <= 4):
+          fields_stream += data
+          fields_stream += (4 - len(data)) * "\x00"
+        else:
+          fields_stream += byteform.itob(data_offset, 4, big_endian = self.big_endian)
+          data_stream   += data
+          data_offset   += len(data)
+          
+      return fields_stream + data_stream

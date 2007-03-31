@@ -56,30 +56,41 @@ DATA_TYPES = {
 
 class IPTCRecord(metainfofile.MetaInfoRecord):
   """ Base class for retrieving data about tags in IPTC records. Derived
-      classes should implement the following lists:
+      classes should have a QDB named tags with the following lists:
       - name : the names of the tags
       - num  : the numbers of the tags
       - count: the number of words every tag should occupy, with None
                     to indicate that this is free
       - type : the numbers of tag data types of the tags, as found in
                 DATA_TYPES
+      Furthermore, each record should have a variable called RECORD_NUM, which
+      holds the record number as described in the IPTC/NAA spec.
   """
   
+  # The data types we know of
+  DATA_TYPES = DATA_TYPES
+  
   def __init__(self, **kwargs):
+    """ Initialize with a file pointer and offset and optionally length, or with
+        data (like DataBlock). The big_endian boolean parameter specifies
+        whether the data is in big endian format (defaults to True). """
+    
+    # Store the tags in the fields dict, where the keys are the tag numbers, and
+    # the values are lists of DataBlocks (since IPTC tags may sometimes be
+    # repeated.
     self.fields = {}
+    
+    # Prepare the data for the base class
     if ("big_endian" in kwargs):
       self.big_endian = kwargs["big_endian"]
       del kwargs["big_endian"]
     else:
       self.big_endian = True
-    datablock.DataBlock.__init__(self, **kwargs)
+    metainfofile.MetaInfoRecord.__init__(self, **kwargs)
     
-  def getTagPayload(self, tag_num):
-    """Returns the payload from a certain tag name or number."""
+  def getTag(self, tag_num):
+    """Return the payload from a certain tag number."""
     
-    # Get the tag number
-    #tag_num = self.__getTagNum__(tag)
-
     if (tag_num in self.fields):
       tags = self.fields[tag_num]
     else:
@@ -87,11 +98,11 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
       return False
 
     # Decipher the relevant info
-    data_type = self.records.query("num", tag_num, "data_type")
+    data_type = self.tags.query("num", tag_num, "data_type")
     payload = []
     for tag in tags:
       data = tag.getData()
-      payload.append(DATA_TYPES[data_type].decode(data, self.big_endian))
+      payload.append(self.DATA_TYPES[data_type].decode(data, self.big_endian))
 
     # Make sure that single values of each read tag are returned a single value
     # and not as list
@@ -105,38 +116,63 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
     
     return payload
 
-  def removeTag(self, tag_num):
-    """ Remove tag with the specified number. """
-    
-    self.fields[tag_num] = []
-
   def setTag(self, tag_num, payload):
     """Sets the payload for a certain tag num or tag name."""
 
-    self.fields[tag_num] = [self.__getTagObj__(tag_num, payload)]
+    # Check if we know of this tag, and if this is the case, set it to a list
+    # with only this tag
+    if self.tags.query("num", tag_num):
+      self.fields[tag_num] = [self.__getTagObj__(tag_num, payload)]
+    else:
+      raise KeyError, "Unknown tag number %d!" % tag_num
 
   def appendTag(self, tag_num, payload):
     """ Append a tag with specified tag number and payload. """
-    
-    if not (tag_num in self.fields):
-      self.setTag(tag_num, payload)
+
+    # Check if we can handle this tag
+    if self.tags.query("num", tag_num):
+      # If we don't have this tag in our internal list, append it with a list
+      # containing one new tag object
+      if not (tag_num in self.fields):
+        self.setTag(tag_num, payload)
+      # Otherwise, append the new tag object to the existing list
+      else:
+        self.fields[tag_num].append(self.__getTagObj__(tag_num, payload))
     else:
-      self.fields[tag_num].append(self.__getTagObj__(tag_num, payload))
-      
+      raise KeyError, "Unknown tag number %d!" % tag_num
+
+  def removeTag(self, tag_num):
+    """ Remove tag with the specified number. """
+
+    # Check if we know of this tag, and if this is the case, set it to an empty
+    # list
+    if self.tags.query("num", tag_num):
+      self.fields[tag_num] = []
+
   def getBlob(self):
     """ Return a binary string representing the IPTC record. """
     
     data_str = ""
     
+    # Iterate over all the tag numbers
     for tag_num in self.getTagNums():
+      # Iterate over all the tags set with this number
       for tag in self.fields[tag_num]:
+        # Each tag starts with 0x1C, the record number, and the tag number
         data_str += "\x1C" + chr(self.RECORD_NUM) + chr(tag_num)
+        
+        # If the number of data bytes exceeds 32767, we should encode an extended tag
         data_length = tag.getDataLength()
         if (data_length > 32767):
-          # We should encode an extended tag
+          # Extended tags are indicated with a 1 for the most significant bit
           data_length = data_length & 32768 # 10000000 00000000
-          data_str += byteform.itob(4, 2, big_endian = self.big_endian) # We cannoot encode it in two bytes, encode it in four. Formally this is incorrect, but in practice this will always do
+          # An extended tag uses two bytes to specify the number of bytes to
+          # encode the length of the data. If we cannot encode the length in
+          # two bytes, we only know how to encode it in four bytes. In
+          # practive this will always do.
+          data_str += byteform.itob(4, 2, big_endian = self.big_endian)
           
+        # Append the data length in bytes, and the actual binary data
         data_str += byteform.itob(data_length, 2, big_endian = self.big_endian)
         data_str += tag.getData()
         
@@ -146,15 +182,15 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
     """ Helper method to prepare a tag object for setTag and appendTag. """
     
     # Get the index and check if we can set this tag
-    index = self.records.query("num", tag_num)
+    index = self.tags.query("num", tag_num)
     if (index is False):
-      raise KeyError, "Tag %d is not known in this IFD!" % tag_num
+      raise KeyError, "Tag %d is not known in this Record!" % tag_num
         
     # Find out the data type for the tag num and make sure it's a list
-    data_type = self.records.query(index, "data_type")
+    data_type = self.tags.query(index, "data_type")
     
     # Retrieve the allowed lengths
-    count = self.records.query(index, "count")
+    count = self.tags.query(index, "count")
     if (type(count) == types.ListType):
       min_count, max_count = count
     else:

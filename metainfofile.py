@@ -22,7 +22,17 @@ import byteform, datablock, qdb, types
 class MetaInfoBlock:
   """ The base class for a particuler kind of metainformation structure, like
       Exif or IPTC info. This class provides the methods for searching over the
-      different records for a specific tag. """
+      different records for a specific tag. This class functions as a base
+      class.
+      Each derived class should have a QDB called records, with the following
+      lists:
+      - num:    the number of each record
+      - name:   the name of each record
+      - record: an instance of a MetaInfoRecord-derived class
+      Furthermore, it should have a dict called DATA_TYPES, where the keys
+      are the number of each data type, and the values a class to manipulate
+      that particular kind of data.
+  """
       
   def getTag(self, tag, record = None):
     """ Return the tag data with the specified number from the specified record.
@@ -33,7 +43,7 @@ class MetaInfoBlock:
     
     # Get the data
     if (record_num):
-      data = self.records.query("num", record_num, "record").getTagPayload(tag_num)
+      data = self.records.query("num", record_num, "record").getTag(tag_num)
       return data
       
     return None
@@ -108,6 +118,12 @@ class MetaInfoRecord(datablock.DataBlock):
       - data_type: the data type as integer, or as a list of integers.
       The also should have a dict DATA_TYPES, coupling a data type number to
       a data type class.
+      Furthermore, each derived class should implement the following methods:
+      - getTag(tag_num): return the payload of the tag with the specified
+                         number.
+      - setTag(tag_num, payload): set the payload of the tag with the specified
+                                  number.
+      - removeTag(tag_num): remove the tag with the specified number.
   """
   
   def getTagNum(self, tag):
@@ -118,11 +134,11 @@ class MetaInfoRecord(datablock.DataBlock):
     
     # Try numeric input
     if (type(tag) == types.IntType):
-      if (self.records.query("num", tag)):
+      if (self.tags.query("num", tag)):
         tag_num = tag
     # Try text input
     elif (type(tag) == types.StringType):
-      tag_num = self.records.query("name", tag, "num")
+      tag_num = self.tags.query("name", tag, "num")
     else:
       raise TypeError, "Incorrect input type for finding tag numbers."
       
@@ -156,7 +172,7 @@ class MetaInfoFile:
     # Iterate over all IFD's
     for ifd in ['tiff', 'exif', 'gps']:
       if (self.ifds[ifd]):
-        payload = self.ifds[ifd].getTagPayload(tag)
+        payload = self.ifds[ifd].getTag(tag)
         if payload:
           break
 

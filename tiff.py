@@ -81,20 +81,7 @@ class Tiff(metainfofile.MetaInfoFile):
       self.iptc = iptcnaa.IPTC(self.fp, iptc_offset) 
     except KeyError:
       self.iptc = iptcnaa.IPTC()
-      
-##    if (33723 in self.ifds["tiff"].fields):
-##      iptc_offset = self.ifds["tiff"].fields[33723].getDataOffset()
-##      iptc_length = self.ifds["tiff"].fields[33723].getDataLength()
-##      self.iptc_info = iptc.IPTC(self.fp, iptc_offset, iptc_length) 
-##    else:
-##      self.iptc_info = None
-      
-    #self.fp.seek(self.ifd_offsets["ifd0"] + self.ifds["ifd0"].getSize())
-    #data = convBytes2Int(self.fp.read(4))
-    #if (data != 0):
-    #  self.ifd_offsets["ifd1"] = data
-    #  self.ifds["ifd1"] = ifd.IFD(self.fp, self.ifd_offsets["ifd1"], self.big_endian)
-    
+          
   def writeFile(self, file_path):
     # Write the header
     out_fp = file(file_path, "w")
@@ -105,43 +92,15 @@ class Tiff(metainfofile.MetaInfoFile):
     out_fp.write(byteform.itob(42, 2, big_endian = self.big_endian))
     out_fp.write(byteform.itob(8, 4, big_endian = self.big_endian))
     
-##    curr_offset = 8
-##    if ("tiff" in self.ifds):
-##      curr_offset += self.ifds["tiff"].getSize()
-##    if ("exif" in self.ifds):
-##      self.ifds["tiff"].setTagPayload("Exif IFD Pointer", curr_offset)
-##      exif_ifd_offset = curr_offset
-##      curr_offset += self.ifds["exif"].getSize()
-##    if ("gps" in self.ifds):
-##      self.ifds["tiff"].setTagPayload("GPSInfo IFD Pointer", curr_offset)
-##      gps_ifd_offset = curr_offset
-##      curr_offset += self.ifds["gps"].getSize()
-##    if ("interop" in self.ifds):
-##      self.ifds["tiff"].setTagPayload(40965, curr_offset)
-##      interop_ifd_offset = curr_offset
-##      curr_offset += self.ifds["interop"].getSize()
-##
-##    # Save the old strip offsets before we overwrite it
-##    old_strip_offsets = self.ifds["tiff"].getTagPayload("StripOffsets")
-##    
-##    # Write the IFD's
-##    out_fp.write(self.ifds["tiff"].getByteStream(8))
-##    if ("exif" in self.ifds):
-##      out_fp.write(self.ifds["exif"].getByteStream(exif_ifd_offset))
-##    if ("gps" in self.ifds):
-##      out_fp.write(self.ifds["gps"].getByteStream(gps_ifd_offset))
-##    if ("interop" in self.ifds):
-##      out_fp.write(self.ifds["interop"].getByteStream(interop_ifd_offset))
-
-    # Embed the IPTC data
+    # Embed the IPTC data in the Exif structure
     if (self.iptc):
       self.exif.setTag(33723, self.iptc.getBlob(), record = 1)
       
     # Save the old strip offsets before we overwrite it
     old_strip_offsets = self.exif.getTag("StripOffsets")
 
-    # Restructure the Exif metadata: TODO: IPTC
-    curr_offset = self.exif.getSize() + 8    
+    # Restructure the Exif metadata to contain the new strip offsets
+    curr_offset = self.exif.getSize() + 8 # 8 bytes for the Tiff header
     tiff = self.exif.records.query("name", "tiff", "record")
     strip_lengths = self.exif.getTag("StripByteCounts")
     new_strip_offsets = []
