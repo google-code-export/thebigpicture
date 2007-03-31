@@ -54,12 +54,30 @@ class MetaInfoBlock:
         will try to figure out which record is meant. """
         
     # Get the record and tag number
-    rec_num, tag_num = self.__getRecordAndTagNum__(tag)
+    rec_num, tag_num = self.__getRecordAndTagNum__(tag, record)
     
     # Set the data.
     if (rec_num):
       self.records.query("num", rec_num, "record").setTag(tag_num, payload)
   
+  def removeTag(self, tag, record = None):
+    """ Remove the tag with the specified name or number from the strucrure. """
+    # Get the record and tag number
+    rec_num, tag_num = self.__getRecordAndTagNum__(tag, record)
+    
+    # Set the data.
+    if (rec_num):
+      self.records.query("num", rec_num, "record").removeTag(tag_num)
+    
+  def hasTags(self):
+    """ Returns True of the structure has any tags set, or False otherwise. """
+    
+    has_tags = False
+    for record in self.records.getList("record"):
+      has_tags = has_tags or record.hasTags()
+      
+    return has_tags
+    
   def __getRecordNum__(self, record):
     """ Return the record number based on a record number or name. """
     
@@ -160,32 +178,62 @@ class MetaInfoFile:
   """The base class for files containing meta information."""
   
   def __init__(self):
-    pass
-    #self.ifds = dict.fromkeys(["tiff", "exif", "gps"], None)
-    #self.iptc_info = None
-
-  def getExifTagPayload(self, tag):
-    """ Return the payload of a tag with the specified name. """
+    self.exif = None
+    self.IPTC = None
     
-    payload = None
-    
-    # Iterate over all IFD's
-    for ifd in ['tiff', 'exif', 'gps']:
-      if (self.ifds[ifd]):
-        payload = self.ifds[ifd].getTag(tag)
-        if payload:
-          break
-
-    return payload
-    
-  def getExifBlob(self, offset = 0):
-    """ Return the encoded Tiff, Exif and GPS IFD's as a block. """
+  def getExifTag(self, tag, record = None):
+    """ Return the payload of the Exif tag with the specified name or number, or
+        False if it doesn't exit. The optional record parameter specifies the
+        name or number of the record where the tag belongs. """
     
     if (self.exif):
-      return self.exif.getBlob(offset)
-    else:
-      return None
+      return self.exif.getTag(tag, record)
+    return False
+      
+  def setExifTag(self, tag, payload, record = None):
+    """ Set the specified Exif tag name or number to the payload. The optional 
+        record parameter specifies the name or number of the record where the
+        tag belongs. """
+        
+    if (self.exif):
+      self.exif.setTag(tag, payload, record = record)
+  
+  def delExifTag(self, tag, record = None):
+    """ Remove the Exif tag with the specified name or number. The optional
+        record parameter specifies the name or number of the record where the
+        tag belongs. """
+    if (self.exif):
+      self.exif.removeTag(tag, record)
     
-  def getIPTCBlock(self):
-    """ Return the encoded IPTC data as a blcok. """
-    pass
+  def getIPTCTag(self, tag, record = None):
+    """ Return the payload of the IPTC tag or tags with the specified name or
+        number, or False if it doesn't exit. The optional record parameter
+        specifies the name or number of the record where the tag belongs. """
+    
+    if (self.iptc):
+      return self.iptc.getTag(tag, record)
+    return False
+
+  def setIPTCTag(self, tag, payload, record = None):
+    """ Set the specified IPTC tag name or number to the payload. The optional 
+        record parameter specifies the name or number of the record where the
+        tag belongs. """
+        
+    if (self.iptc):
+      self.iptc.setTag(tag, payload, record = record)
+
+  def appendIPTCTag(self, tag, payload, record = None):
+    """ Append the payload to the alreadyd defined IPTC tags with the specified
+        name or number. The optional record parameter specifies the name or
+        number of the record where the tag belongs. """
+        
+    if (self.iptc):
+      self.iptc.appendTag(tag, payload, record = record)
+      
+  def delIPTCTag(self, tag, record = None):
+    """ Remove the IPTC tag or tags with the specified name or number. The 
+        optional record parameter specifies the name or number of the record
+        where the tag belongs. """
+        
+    if (self.iptc):
+      self.iptc.removeTag(tag, record)

@@ -143,7 +143,7 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
       out_str += record.getBlob()
     return out_str
     
-  def appendTag(self, tag, payload, rec = None):
+  def appendTag(self, tag, payload, record = None):
     """ Append a tag to the list of tags. """
   
     rec_num, tag_num = self.__getRecordAndTagNum__(tag)

@@ -247,7 +247,7 @@ class JPEG(metainfofile.MetaInfoFile):
     byte_str += byteform.itob(8, 4, big_endian = ifd_big_endian)
     
     # Write the Exif data
-    byte_str += self.getExifBlob(8)
+    byte_str += self.exif.getBlob(8)
     
     # Put the Exif data into an appropriate APP1 segment. FIXME: This
     # invalidates that segment for future data extraction.

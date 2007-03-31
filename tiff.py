@@ -110,7 +110,7 @@ class Tiff(metainfofile.MetaInfoFile):
     self.exif.setTag("StripOffsets", new_strip_offsets)
 
     # Write the Exif data
-    out_fp.write(self.getExifBlob(8))
+    out_fp.write(self.exif.getBlob(8))
     
     # Write the image data
     for strip_num in range(len(strip_lengths)):
