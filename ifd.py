@@ -49,7 +49,7 @@ class Ascii(datatypes.DataType):
     """ Convert a byte stream to a list of strings. The is_big_endian parameter
         is only here for compatibility reasons. """
         
-    streams = []
+    streams = [""]
     
     # Iterate over all the characters in the byte stream, and start a new string
     # at every null character
@@ -58,7 +58,7 @@ class Ascii(datatypes.DataType):
         streams.append("")
       else:
         streams[-1] += char
-        
+
     return streams
     
 DATA_TYPES = {

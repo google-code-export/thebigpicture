@@ -68,10 +68,11 @@ class Segment(datablock.DataBlock):
   """ A class for managing JPEG segments. """
   
   def __init__(self, *args, **kwargs):
-    """ The segment can be initialized in two forms:
+    """ The segment can be initialized in three forms:
         - With a file pointer and offset in this file to the start of the
           segment (the 0xFF0xXX part).
-        - With a byte stream 
+        - With a data stream
+        - With a segment number
     """
     
     if ("big_endian" in kwargs): self.big_endian = kwargs["big_endian"]
@@ -82,20 +83,20 @@ class Segment(datablock.DataBlock):
     if (len(args) not in [1, 2]):
       raise "Segment class wasn't initialized properly!"
       
-    # We construct a separate dics for the Tag arguments
-    tag_kwargs = {}
+    # We construct a separate dict for the DataBlock arguments
+    base_kwargs = {}
     
     # Check the different initialization types
     if (type(args[0]) == types.IntType):
       # Initialized with tag num
       self.number = args[0]
       if (len(args) == 2):
-        tag_kwargs["data"] = args[1]
+        base_kwargs["data"] = args[1]
         
     elif (type(args[0]) == types.StringType):
-      # Initialized with data string
+      # Initialized with data string. FIXME: What about file pointer initialization?
       self.number, length = self.__parseHeader__(args[0][:4])
-      tag_kwargs["data"] = args[0][4:length + 4] # Skip first four bytes of segment header
+      base_kwargs["data"] = args[0][4:length + 4] # Skip first four bytes of segment header
       
     elif (type(args[0]) == types.FileType):
       # Initialized with file pointer
@@ -106,12 +107,12 @@ class Segment(datablock.DataBlock):
       self.number, length = self.__parseHeader__(fp.read(4))
       
       # Construct the data for tag init
-      tag_kwargs["fp"]     = fp
-      tag_kwargs["offset"] = offset + 4 # Data starts four bytes after segment
-      tag_kwargs["length"] = length
+      base_kwargs["fp"]     = fp
+      base_kwargs["offset"] = offset + 4 # Data starts four bytes after segment
+      base_kwargs["length"] = length
     
     # Call the Tag constructor
-    datablock.DataBlock.__init__(self, **tag_kwargs)
+    datablock.DataBlock.__init__(self, **base_kwargs)
     
   def __parseHeader__(self, header):
     """ Parse the first bytes of the segment header, and return a list of number
@@ -223,10 +224,17 @@ class Jpeg(metainfofile.MetaInfoFile):
       for seg in self.segments[SEG_NUMS["APP13"]]:
         if (seg.read(14, 0) == "Photoshop 3.0\x00"):
           ps = photoshop.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
-          if (1028 in ps.tags):
+          if (1028 in ps.tags): # IPTC info is tag 1028
             self.iptc_segment = seg
             self.ps_info      = ps
             self.iptc = iptcnaa.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
+    
+    # If we didn't find IPTC info, create the containing structures
+    if (not self.iptc_segment):
+      self.iptc_segment = Segment(SEG_NUMS["APP13"])
+      self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
+    if (not self.ps_info):
+      self.ps_info = photoshop.Photoshop()
   
   def writeFile(self, file_path):
     # Open the new file for writing
