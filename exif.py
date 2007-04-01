@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import metainfofile, ifd, qdb, ifddatatypes
+import metainfofile, ifd, qdb
 
 # The Tiff IFD (first part off IFD0 in Tiff file).
 class TiffIFD(ifd.IFD):

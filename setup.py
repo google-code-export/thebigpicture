@@ -18,5 +18,5 @@ setup(name = 'thebigpicture',
         'Programming Language :: Python',
         'Topic ::	Multimedia :: Graphics'
       ],
-      provides = ["TBP"]
+      provides = ["The Big Picture"]
      )
