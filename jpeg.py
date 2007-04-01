@@ -36,6 +36,10 @@ import types
 SEGMENTS = ["APP0", "APP1", "APP2", "APP3", "APP4", "APP5", "APP6", "APP7", "APP8", "APP9", "APP10", "APP11", "APP12", "APP13", "APP14", "APP15", "COM", "DQT", "DRI", "DHT", "SOF0", "SOF1", "SOF2", "SOF3", "SOS", "EOI"]
 
 SEG_NUMS = {
+  "DQT":   0xDB,
+  "DHT":   0xC4,
+  "DRI":   0xDD,
+  "COM":   0xFE,
   "APP0":  0xE0,
   "APP1":  0xE1,
   "APP2":  0xE2,
@@ -52,10 +56,6 @@ SEG_NUMS = {
   "APP13": 0xED,
   "APP14": 0xEE,
   "APP15": 0xEF,
-  "COM":   0xFE,
-  "DQT":   0xDB,
-  "DRI":   0xDD,
-  "DHT":   0xC4,
   "SOF0":  0xC0,
   "SOF1":  0xC1,
   "SOF2":  0xC2,
@@ -143,7 +143,7 @@ class Segment(datablock.DataBlock):
       
     return byte_str
       
-class JPEG(metainfofile.MetaInfoFile):
+class Jpeg(metainfofile.MetaInfoFile):
   """Parse and write JPEG files."""
 
   # JPEG files are always big endian
