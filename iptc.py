@@ -88,7 +88,7 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
       self.big_endian = True
     metainfofile.MetaInfoRecord.__init__(self, **kwargs)
     
-  def getTag(self, tag_num):
+  def getTag(self, tag_num, data_type = None):
     """Return the payload from a certain tag number."""
     
     if (tag_num in self.fields):
@@ -97,8 +97,14 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
       # If the tag was not found, return False
       return False
 
+    # Get the data type
+    if not (data_type):
+      index = self.tags.query("num", tag_num)
+      if (index == False):
+        raise "Unknown tag and no data type provided, so I don't know how to decode it"
+      data_type = self.tags.query(index, "data_type")
+
     # Decipher the relevant info
-    data_type = self.tags.query("num", tag_num, "data_type")
     payload = []
     for tag in tags:
       data = tag.getData()
@@ -116,30 +122,28 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
     
     return payload
 
-  def setTag(self, tag_num, payload):
-    """Sets the payload for a certain tag num or tag name."""
+  def setTag(self, tag_num, payload = None, check = True, data_type = None, count = None, data = None):
+    """ Sets the payload for a certain tag num or tag name. If check is False,
+        the method doesn't check if it knows of this tag. In this case however,
+        a data type (integer) and optionaly data count or a binary encoded data
+        string should be provided. """
 
-    # Check if we know of this tag, and if this is the case, set it to a list
-    # with only this tag
-    if self.tags.query("num", tag_num):
-      self.fields[tag_num] = [self.__getTagObj__(tag_num, payload)]
+    # Set a list with only this tag
+    self.fields[tag_num] = [self.__getTagObj__(tag_num, payload, check, data_type, count, data)]
+
+  def appendTag(self, tag_num, payload = None, check = True, data_type = None, count = None, data = None):
+    """ Appends a tag with the specified payload. for a certain tag num or tag 
+        name. If check is False, the method doesn't check if it knows of this
+        tag. In this case however, a data type (integer) and optionaly data
+        count or a binary encoded data string should be provided. """
+
+    # If we don't have this tag in our internal list, append it with a list
+    # containing one new tag object
+    if not (tag_num in self.fields):
+      self.setTag(tag_num, payload, check, data_type, count, data)
+    # Otherwise, append the new tag object to the existing list
     else:
-      raise KeyError, "Unknown tag number %d!" % tag_num
-
-  def appendTag(self, tag_num, payload):
-    """ Append a tag with specified tag number and payload. """
-
-    # Check if we can handle this tag
-    if self.tags.query("num", tag_num):
-      # If we don't have this tag in our internal list, append it with a list
-      # containing one new tag object
-      if not (tag_num in self.fields):
-        self.setTag(tag_num, payload)
-      # Otherwise, append the new tag object to the existing list
-      else:
-        self.fields[tag_num].append(self.__getTagObj__(tag_num, payload))
-    else:
-      raise KeyError, "Unknown tag number %d!" % tag_num
+      self.fields[tag_num].append(self.__getTagObj__(tag_num, payload, check, data_type, count, data))
 
   def removeTag(self, tag_num):
     """ Remove tag with the specified number. """
@@ -178,38 +182,53 @@ class IPTCRecord(metainfofile.MetaInfoRecord):
         
     return data_str
 
-  def __getTagObj__(self, tag_num, payload):
+  def __getTagObj__(self, tag_num, payload = None, check = True, data_type = None, count = None, data = None):
     """ Helper method to prepare a tag object for setTag and appendTag. """
-    
+
     # Get the index and check if we can set this tag
     index = self.tags.query("num", tag_num)
     if (index is False):
-      raise KeyError, "Tag %d is not known in this Record!" % tag_num
+      if (check):
+        raise KeyError, "Tag %d is not known in this record!" % tag_num
+      else:
+        if not ((data_type) or (data)):
+          raise KeyError, "Unknown tag %d, and no further way to encode it" % tag_num
+
+    # If the user wants to set the data herself, check if its of the correct 
+    # type
+    if (data):
+      if (type(data) != types.StringType):
+        raise TypeError, "IPTC data should be a binary string"
+    # Otherwise, encode it
+    elif (payload):
+      # Find out the data type for the tag num
+      if (not data_type):
+        data_type = self.tags.query(index, "data_type")
+      
+      # Retrieve the allowed lengths
+      if (not count):
+        count = self.tags.query(index, "count")
+      if (type(count) == types.ListType):
+        min_count, max_count = count
+      else:
+        min_count = count
+        max_count = count
         
-    # Find out the data type for the tag num and make sure it's a list
-    data_type = self.tags.query(index, "data_type")
-    
-    # Retrieve the allowed lengths
-    count = self.tags.query(index, "count")
-    if (type(count) == types.ListType):
-      min_count, max_count = count
+      # Check if the payload has enough data
+      if (type(payload) not in [types.ListType, types.TupleType, types.StringType]):
+        payload = [payload]
+      if ((min_count) and (max_count)): # This might not be the case if we encode an unknown tag and the user didn't supply a count
+        if ((len(payload) < min_count) or (len(payload) > max_count)):
+          raise "Wrong number of arguments supplied to encode tag %s!" % str(tag_num)
+  
+      # Encode the data
+      data = DATA_TYPES[data_type].encode(payload, self.big_endian)
+      
+      # If data type is Digits, pad it with zeroes
+      if (data_type == 15):
+        word_width = DATA_TYPES[data_type].word_width
+        data = ((min_count * word_width) - len(data)) * "0" + data
     else:
-      min_count = count
-      max_count = count
+      raise "Specify either a payload and optionally means to encode, or binary data"
       
-    # Check if the payload has enough data
-    if (type(payload) not in [types.ListType, types.TupleType, types.StringType]):
-      paylaod = [payload]
-    if ((len(payload) < min_count) or (len(payload) > max_count)):
-      raise "Wrong number of arguments supplied to encode tag %s!" % str(tag_num)
-
-    # Encode the data
-    data = DATA_TYPES[data_type].encode(payload, self.big_endian)
-    
-    # If data type is Digits, pad it with zeroes
-    if (data_type == 15):
-      word_width = DATA_TYPES[data_type].word_width
-      data = ((min_count * word_width) - len(data)) * "0" + data
-      
-    return datablock.DataBlock(data = data)    
-
+    return datablock.DataBlock(data = data)

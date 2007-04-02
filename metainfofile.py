@@ -34,31 +34,59 @@ class MetaInfoBlock:
       that particular kind of data.
   """
       
-  def getTag(self, tag, record = None):
+  def getTag(self, tag, record = None, data_type = None):
     """ Return the tag data with the specified number from the specified record.
     """
     
-    # Get the record and tag numberss
-    record_num, tag_num = self.__getRecordAndTagNum__(tag, record)
-    
+    # Get the record and tag numbers
+    try:
+      record_num, tag_num = self.__getRecordAndTagNum__(tag, record)
+    except KeyError:
+      # We're dealing with an unknown tag, but it may have been loaded from disk
+      if (type(tag) == types.IntType):
+        tag_num = tag
+        record_num = self.__getRecordNum__(record)
+      if not (tag_num) and (record_num):
+        raise TypeError, "Unknown tag %s, please specify tag number and record number" % str(tag)
+        
     # Get the data
     if (record_num):
-      data = self.records.query("num", record_num, "record").getTag(tag_num)
+      # Construct the options list to getTag. This method sometimes accepts the
+      # data_type argument, and sometimes does not
+      gt_args = [tag_num]
+      if (data_type):
+        gt_args.append(tag_num)
+        
+      # Retrieve the data
+      data = self.records.query("num", record_num, "record").getTag(*gt_args)
       return data
       
     return None
     
-  def setTag(self, tag, payload, record = None):
+  def setTag(self, tag, payload = None, record = None, check = True, data_type = None, data_count = None, data = None):
     """ Set the specified tag in the specified record to the data, overriding
         all other occurences of that tag. If record num is omitted, the method
         will try to figure out which record is meant. """
         
     # Get the record and tag number
-    rec_num, tag_num = self.__getRecordAndTagNum__(tag, record)
-    
+    try:
+      rec_num, tag_num = self.__getRecordAndTagNum__(tag, record)
+    # If we have an unknown tag, check if the data is in the correct format to 
+    # set it
+    except KeyError:
+      if not (record):
+        raise "Unknown tag %s, record needed" % str(tag)
+      else:
+        rec_num = self.__getRecordNum__(record)
+
+      if (type(tag) in [types.IntType, types.LongType]):
+        tag_num = tag
+      else:
+        raise TypeError, "Unknown tag %s, needs to be specified as a number" % str(tag)
+
     # Set the data.
     if (rec_num):
-      self.records.query("num", rec_num, "record").setTag(tag_num, payload)
+      self.records.query("num", rec_num, "record").setTag(tag_num, payload, check, data_type, data_count, data)
   
   def removeTag(self, tag, record = None):
     """ Remove the tag with the specified name or number from the strucrure. """
@@ -168,7 +196,7 @@ class MetaInfoRecord(datablock.DataBlock):
     tag_nums = self.fields.keys()
     tag_nums.sort()
     return tag_nums
-
+    
   def hasTags(self):
     """ Return True if the record has any tags set, or False if not. """
     
@@ -190,13 +218,21 @@ class MetaInfoFile:
       return self.exif.getTag(tag, record)
     return False
       
-  def setExifTag(self, tag, payload, record = None):
-    """ Set the specified Exif tag name or number to the payload. The optional 
+  def setExifTag(self, tag, payload = None, record = None, check = True, data_type = None, count = None, data = None):
+    """ Set the specified Exif tag name or number. Usually the payload parameter
+        specifies the unencoded payload that needs to be set. Alternatively,
+        encoded payload may be specified with the data parameter. The optional 
         record parameter specifies the name or number of the record where the
-        tag belongs. """
+        tag belongs.
+        If the tag is unknown, a KeyError is raised. If you still want to set
+        the tag, check can be set to False. In this case, a record needs to be 
+        specified to store the tag in and a data type for the format.
+        Additionaly, if a payload is specified, an optional data count may be
+        given for sanity checking.
+    """
         
     if (self.exif):
-      self.exif.setTag(tag, payload, record = record)
+      self.exif.setTag(tag, payload, record, check, data_type, count, data)
   
   def delExifTag(self, tag, record = None):
     """ Remove the Exif tag with the specified name or number. The optional
@@ -205,22 +241,32 @@ class MetaInfoFile:
     if (self.exif):
       self.exif.removeTag(tag, record)
     
-  def getIPTCTag(self, tag, record = None):
+  def getIPTCTag(self, tag, record = None, data_type = None):
     """ Return the payload of the IPTC tag or tags with the specified name or
         number, or False if it doesn't exit. The optional record parameter
-        specifies the name or number of the record where the tag belongs. """
+        specifies the name or number of the record where the tag belongs. The
+        optional data_type arguments is needed when the tag is unknown in the
+        internal libraries, and used to decode the data. """
     
     if (self.iptc):
-      return self.iptc.getTag(tag, record)
+      return self.iptc.getTag(tag, record, data_type)
     return False
 
-  def setIPTCTag(self, tag, payload, record = None):
-    """ Set the specified IPTC tag name or number to the payload. The optional 
+  def setIPTCTag(self, tag, payload = None, record = None, check = True, data_type = None, count = None, data = None):
+    """ Set the specified IPTC tag name or number. Usually the payload parameter
+        specifies the unencoded payload that needs to be set. Alternatively,
+        encoded payload may be specified with the data parameter. The optional 
         record parameter specifies the name or number of the record where the
-        tag belongs. """
+        tag belongs.
+        If the tag is unknown, a KeyError is raised. If you still want to set
+        the tag, check can be set to False. In this case, a record needs to be 
+        specified to store the tag in and a data type for the format.
+        Additionaly, if a payload is specified, an optional data count may be
+        given for sanity checking.
+    """
         
     if (self.iptc):
-      self.iptc.setTag(tag, payload, record = record)
+      self.iptc.setTag(tag, payload, record, check, data_type, count, data)
 
   def appendIPTCTag(self, tag, payload, record = None):
     """ Append the payload to the alreadyd defined IPTC tags with the specified

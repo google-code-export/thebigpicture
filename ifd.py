@@ -49,15 +49,18 @@ class Ascii(datatypes.DataType):
     """ Convert a byte stream to a list of strings. The is_big_endian parameter
         is only here for compatibility reasons. """
         
-    streams = [""]
+    streams = []
+    curr_stream = ""
     
     # Iterate over all the characters in the byte stream, and start a new string
     # at every null character
     for char in byte_stream:
       if (char == "\x00"):
-        streams.append("")
+        if (len(curr_stream) > 0):
+          streams.append(curr_stream)
+        curr_stream = ""
       else:
-        streams[-1] += char
+        curr_stream += char
 
     return streams
     
@@ -172,7 +175,8 @@ class IFD(metainfofile.MetaInfoRecord):
         else:
           payload_offset = byteform.btoi(self.read(4), big_endian = self.big_endian) + self.header_offset - self.ifd_offset
 
-        # Store the tag
+        # Store the tag. This method does not check if we know the tag type, and
+        # that's exactly what we want.
         if (self.fp):
           tag = Tag(self.fp, payload_offset + self.ifd_offset, num_bytes, data_type)
         else:
@@ -180,7 +184,7 @@ class IFD(metainfofile.MetaInfoRecord):
         self.fields[tag_type] = tag
 
   def getTag(self, tag_num):
-    """Returns the payload from a certain tag number."""
+    """Returns the payload from a certain tag number. """
     
     if (tag_num in self.fields):
       tag = self.fields[tag_num]
@@ -200,40 +204,62 @@ class IFD(metainfofile.MetaInfoRecord):
     else:
       return payload
 
-  def setTag(self, tag_num, payload):
-    """Sets the payload for a certain tag num or tag name."""
+  def setTag(self, tag_num, payload = None, check = True, data_type = None, count = None, data = None):
+    """ Sets the (unencoded) payload or (binary encoded) data for a certain tag 
+        num or tag name. If check is False, the method doesn't check if it knows
+        of this tag. In this case however, a data type (integer) needs to be
+        provided. In the case of payload, the optional count parameter can
+        provide a sanuty check. """
 
     # Get the index and check if we can set this tag
     index = self.tags.query("num", tag_num)
     if (index is False):
-      raise KeyError, "Tag %d is not known in this IFD!" % tag_num
+      if (check):
+        raise KeyError, "Tag %d is not known in this IFD!" % tag_num
+      else:
+        if not ((data_type) or (data)):
+          raise KeyError, "Unknown tag %d, and no further way to encode it" % tag_num
     
-    # Make sure the payload is in a sequence      
-    if (type(payload) not in [types.ListType, types.TupleType]):
-      payload = [payload]
+    # If the user supplied data, use that
+    if (data):
+      # Check for the correct parameters
+      if (type(data) != types.StringType):
+        raise TypeError, "IFD data should be a binary string"
+      if (type(data_types) != types.IntType):
+        raise TypeError, "When setting an IFD tag directly with binary data, you need to specify exactly one data type"
+    # Otherwise, encode the tag ourselve
+    else:
+      # Make sure the payload is in a sequence      
+      if (type(payload) not in [types.ListType, types.TupleType]):
+        payload = [payload]
+        
+      # Check if the supplied data is of correct length
+      if (not count) and (index):
+        count = self.tags.query("num", tag_num, "count")
+      if (count != None) and (count != False) and (count != -1): # Unknonw, unspecified or special
+        if (len(payload) != count):
+          raise "Wrong number of arguments supplied for encoding this tag!"
       
-    # Check if the supplied data is of correct length
-    count = self.tags.query("num", tag_num, "count")
-    if (count != None) and (count != -1): # Unspecified or special
-      if (len(payload) != count):
-        raise "Wrong number of arguments supplied for encoding this tag!"
-    
-    # Find out the data type for the tag num and make sure it's a list
-    data_types = self.tags.query("num", tag_num, "data_type")
-    if (type(data_types) == types.IntType):
-      data_types = [data_types]
-    
-    # Try to encode the data with each of the possible data types. Stop when
-    # we succeeded.
-    success = False
-    for data_type in data_types:
-      try:
-        data = DATA_TYPES[data_type].encode(payload, self.big_endian)
-        success = True
-      except:
-        pass
-      if (success):
-        break
+      # Find out the data type for the tag num and make sure it's a list
+      if (data_type):
+        data_types = data_type
+        del(data_type)
+      else:
+        data_types = self.tags.query("num", tag_num, "data_type")
+      if (type(data_types) == types.IntType):
+        data_types = [data_types]
+      
+      # Try to encode the data with each of the possible data types. Stop when
+      # we succeeded.
+      success = False
+      for data_type in data_types:
+        try:
+          data = DATA_TYPES[data_type].encode(payload, self.big_endian)
+          success = True
+        except:
+          pass
+        if (success):
+          break
       
     # Set the used data type and payload
     self.fields[tag_num] = Tag(data, data_type)

@@ -130,7 +130,7 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
         start_byte = self.read(1)
       except IOError:
         break
-      
+
   def getBlob(self):
     """ Return the entire IPTC record as binary data blob. """
     
