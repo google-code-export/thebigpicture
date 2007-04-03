@@ -219,7 +219,7 @@ class IFD(metainfofile.MetaInfoRecord):
       else:
         if not ((data_type) or (data)):
           raise KeyError, "Unknown tag %d, and no further way to encode it" % tag_num
-    
+
     # If the user supplied data, use that
     if (data):
       # Check for the correct parameters
@@ -260,7 +260,10 @@ class IFD(metainfofile.MetaInfoRecord):
           pass
         if (success):
           break
-      
+          
+      if (data == None):
+        raise "Error encoding data for tag %d!" % tag_num
+
     # Set the used data type and payload
     self.fields[tag_num] = Tag(data, data_type)
 

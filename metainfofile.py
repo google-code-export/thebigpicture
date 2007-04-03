@@ -46,7 +46,7 @@ class MetaInfoBlock:
       if (type(tag) == types.IntType):
         tag_num = tag
         record_num = self.__getRecordNum__(record)
-      if not (tag_num) and (record_num):
+      if (tag_num == None) and (record_num == None):
         raise TypeError, "Unknown tag %s, please specify tag number and record number" % str(tag)
         
     # Get the data
@@ -117,7 +117,7 @@ class MetaInfoBlock:
         raise ValueError, "Unknown record %d!" % record
     # Test text input
     elif (type(record) == types.StringType):
-      index = self.records.getList("name", record)
+      index = self.records.query("name", record)
       if (index):
         return self.records.query(index, "num")
       else:
@@ -162,7 +162,7 @@ class MetaInfoRecord(datablock.DataBlock):
                    lists with the minimum and maximum count. None means that
                    this is undefined.
       - data_type: the data type as integer, or as a list of integers.
-      The also should have a dict DATA_TYPES, coupling a data type number to
+      They also should have a dict DATA_TYPES, coupling a data type number to
       a data type class.
       Furthermore, each derived class should implement the following methods:
       - getTag(tag_num): return the payload of the tag with the specified

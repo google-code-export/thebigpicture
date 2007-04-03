@@ -1,3 +1,22 @@
+# Copyright 2007 Pieter Edelman (p _dot_ edelman _at_ gmx _dot_ net)
+#
+# This file is part of The Big Picture.
+# 
+# The Big Picture is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# The Big Picture is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public License
+# along with The Big Picture; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+# 
+
 import types
 
 class QDB:
@@ -9,7 +28,7 @@ class QDB:
     # Check for the proper lengths of all the lists
     self.length = None
     for var_name in dir(self):
-      var = eval("self.%s" % var_name)
+      var = getattr(self, var_name)
       if (type(var) == types.ListType):
         self.__checkLength__(var)
   
@@ -100,6 +119,36 @@ class QDB:
     """ Return one of the list, named var_name. """
     return getattr(self, var_name)
     
+  def appendValue(self, *args):
+    """ Append values to the internal lists. The arguments should be
+        "var1_name", value1, "var2_name", value2, etc. """
+    
+    # Do a first sanity check by making sure that we have an even number of
+    # arguments
+    if ((len(args) & 1) != 0):
+      raise "Wrong number of arguments supplied when trying to append to a QDB!"
+    
+    # Set all the arguments to the appropriate lists
+    for arg_num in range(0, len(args), 2):
+      arg_name = args[arg_num]
+      
+      # Check if we're of the correct type
+      if (type(arg_name) != types.StringType):
+        raise "Format a call to appendValue like 'var1_name', value1, 'var2_name', value2, etc."
+        
+      # Set the variable
+      var = getattr(self, arg_name)
+      var.append(args[arg_num + 1])
+    
+    # Update the length parameter
+    self.length += 1
+    
+    # Check if we've had everything
+    for var_name in dir(self):
+      var = getattr(self, var_name)
+      if (type(var) == types.ListType):
+        self.__checkLength__(var)
+      
   def __checkLength__(self, list):
     """ Checks if the length of a list is the same as the others, or sets the
         length if this is not yet known. """

@@ -10,7 +10,7 @@ setup(name = 'thebigpicture',
       author_email = 'p.edelman@gmx.net',
       url = 'http://code.google.com/p/thebigpicture/',
       classifiers = [
-        'Development Status] :: 3 - Alpha',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License ::	OSI Approved :: GNU Lesse General Public License (LGPL)',
         'Operating System :: POSIX :: Linux',

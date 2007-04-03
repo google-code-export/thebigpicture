@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import metainfofile, ifd, qdb
+import metainfofile, ifd, qdb, makernote
 
 # The Tiff IFD (first part off IFD0 in Tiff file).
 class TiffIFD(ifd.IFD):
@@ -57,6 +57,17 @@ class InteropIFD(ifd.IFD):
   tags.addList("data_type", [])
   tags.addList("count", [])
 
+MAKERNOTES = {
+  "Canon":          makernote.CanonIFD,
+  "FUJIFILM":       makernote.FujifilmIFD,
+  "Minolta":        makernote.MinoltaIFD,
+  "KONICA MINOLTA": makernote.MinoltaIFD,
+  "OLYMPUS":        makernote.OlympusIFD,
+  "SGIMA":          makernote.SigmaIFD,
+  "FOVEON":         makernote.FoveonIFD,
+  "Panasonic":      makernote.PanasonicIFD
+}
+
 class Exif(metainfofile.MetaInfoBlock):    
   def __init__(self, file_pointer, ifd_offset, header_offset = 0, big_endian = True):
     """ Read and write an Exif segment in a file. TODO: loading from memory. """
@@ -86,12 +97,26 @@ class Exif(metainfofile.MetaInfoBlock):
       interop = InteropIFD(file_pointer, interop_offset, header_offset, big_endian = big_endian)
     else:
       interop = InteropIFD()
-    
+
     # Create the database of segment data
     self.records = qdb.QDB()
     self.records.addList("num", [1, 2, 3, 4])
     self.records.addList("name", ["tiff", "exif", "gps", "interop"])
     self.records.addList("record", [tiff, exif, gps, interop])
+
+    # If we have a camer Make (tag 271), there is a change that we can load the
+    # makernote, if we know its type
+    if (271 in tiff.fields):
+      make = tiff.getTag(271)
+      
+      # It it's a known type, load it or create an empty one
+      if (make in MAKERNOTES):
+        if (37500 in exif.fields): # Makernote
+          makernote_offset = exif.fields[37500].getDataOffset()
+          makernote = MAKERNOTES[make](file_pointer, makernote_offset, header_offset, big_endian = big_endian)
+        else:
+          makernote = MAKERNOTES[make](big_endian = big_endian)
+      self.records.appendValue("num", 5, "name", "makernote", "record", makernote)    
     
   def getSize(self):
     """ Return the total size of the encoded Exif blocks. """
@@ -111,23 +136,29 @@ class Exif(metainfofile.MetaInfoBlock):
         data offsets (usually this will be 8 bytes for the Tiff header). """
     
     # Retrieve the necessary IFD's
-    tiff    = self.records.query("name", "tiff", "record")
-    exif    = self.records.query("name", "exif", "record")
-    gps     = self.records.query("name", "gps", "record")
-    interop = self.records.query("name", "interop", "record")
+    tiff      = self.records.query("name", "tiff", "record")
+    exif      = self.records.query("name", "exif", "record")
+    gps       = self.records.query("name", "gps", "record")
+    interop   = self.records.query("name", "interop", "record")
+    makernote = self.records.query("name", "makernote", "record")
     
     # Decide whether the tags pointing to other IFD's should be present. As we
     # don't know the offsets yet, we simply set them to zero. This procedure is
     # needed so we can calcuate the proper size of each IFD (and hence, the
     # offsets).
     
-    # Interopability IFD needs to go first, since it is stored in the Exif IFD,
-    # which may be empty or not depending on the prescence of the Interop IFD.
+    # Interopability and Makernote IFD's need to go first, since they are stored
+    # in the Exif IFD, which may be empty or not depending on the prescence of 
+    # these data.
+    if (makernote) and (makernote.hasTags()):
+      exif.setTag(37500, makernote.getBlob(0))
+    else:
+      exif.removeTag(37500)
     if (interop.hasTags()):
       exif.setTag(40965, 0)
     else:
       exif.removeTag(40965)
-      
+
     # Exif IFD
     if (exif.hasTags()):
       tiff.setTag(34665, 0)
