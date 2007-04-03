@@ -111,12 +111,20 @@ class Exif(metainfofile.MetaInfoBlock):
       
       # It it's a known type, load it or create an empty one
       if (make in MAKERNOTES):
+        makernote = None
         if (37500 in exif.fields): # Makernote
-          makernote_offset = exif.fields[37500].getDataOffset()
-          makernote = MAKERNOTES[make](file_pointer, makernote_offset, header_offset, big_endian = big_endian)
-        else:
+          # Get the offset. Note that the Exif tag doesn't specify an offset,
+          # but the actual data, so we have to manually retrieve the offset and
+          # compensate for the header offset.
+          makernote_offset = exif.fields[37500].getDataOffset() - header_offset
+          try:
+            # Try to construct the makernote
+            makernote = MAKERNOTES[make](file_pointer, makernote_offset, header_offset, big_endian = big_endian)
+          except:
+            pass
+        if not (makernote):
           makernote = MAKERNOTES[make](big_endian = big_endian)
-      self.records.appendValue("num", 5, "name", "makernote", "record", makernote)    
+        self.records.appendValue("num", 5, "name", "makernote", "record", makernote)    
     
   def getSize(self):
     """ Return the total size of the encoded Exif blocks. """

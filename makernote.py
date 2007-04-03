@@ -33,19 +33,24 @@ class FujifilmIFD(ifd.IFD):
   tags.addList("data_type", [])
   tags.addList("count", [])
 
-  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = big_endian):
+  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
     # Fujifilm always uses little endian
-    block = datablock.DataBlock(fp = file_pointer, offset = ifd_offset, data = data)
-    if (block.read(8) != "FUJIFILM"):
+    block = datablock.DataBlock(fp = file_pointer, offset = ifd_offset + header_offset, data = data)
+    header = block.read(8)
+    if (header == None):
+      mn_offset = 0
+    elif (header == "FUJIFILM"):
+      mn_offset = byteform.btoi(block.read(4), big_endian = False)
+    else:
       raise "No valid Fujifilm Makernote!"
-    
-    mn_offset = byteform.btoi(block.read(4), big_endian = False)
-    ifd.IFD.__init__(self, file_pointer, mn_offset, ifd_offset, data, big_endian = False)
+      
+    ifd.IFD.__init__(self, file_pointer, mn_offset, ifd_offset + header_offset, data, big_endian = False)
 
 class IFDWithHeader(ifd.IFD):
-  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = big_endian):
+  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
     block = datablock.DataBlock(fp = file_pointer, offset = ifd_offset, data = data)
-    if (block.read(len(self.header_str)) != self.header_str):
+    header = block.read(len(self.header_str))
+    if (header != self.header_str) and (header != ""):
       raise "No valid Makernote!"
     
     ifd.IFD.__init__(self, file_pointer, ifd_offset + self.header_length, header_offset, data, big_endian)
@@ -57,13 +62,13 @@ class MinoltaIFD(ifd.IFD):
   tags.addList("data_type", [])
   tags.addList("count", [])
 
-  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = big_endian):
+  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
     # Minolta always uses big endian
     ifd.IFD.__init__(self, file_pointer, ifd_offset, header_offset, data, big_endian = True)
     
 class OlympusIFD(IFDWithHeader):
   header_str    = "OLYMP\x00"
-  header_length = 6
+  header_length = 10
   
   tags = qdb.QDB()
   tags.addList("name", [])

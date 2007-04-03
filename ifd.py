@@ -197,9 +197,11 @@ class IFD(metainfofile.MetaInfoRecord):
     data      = tag.getData()
     payload   = self.DATA_TYPES[data_type].decode(data, self.big_endian)
 
-    # If the data is a single value, return it as such, otherwise, return a
-    # list
-    if (len(payload) == 1):
+    # If the tag is empty, return None. Else if data is a single value, return 
+    # it as such, otherwise, return a list
+    if (len(payload) == 0):
+      return None
+    elif (len(payload) == 1):
       return payload[0]
     else:
       return payload
