@@ -58,7 +58,7 @@ class Tiff(metainfofile.MetaInfoFile):
       is_tiff = True
       
     # The next two bytes should be 42
-    if (is_tiff) and (byteform.btoi(self.fp.read(2), big_endian = self.big_endian) == 42):
+    if (is_tiff) and (byteform.btousi(self.fp.read(2), big_endian = self.big_endian) == 42):
       is_tiff = True
       
     # If the file does not have a Tiff header, report it as false 
@@ -66,7 +66,7 @@ class Tiff(metainfofile.MetaInfoFile):
       raise "File is not Tiff"
     
     # Read the Exif data
-    exif_offset = byteform.btoi(self.fp.read(4), big_endian = self.big_endian)
+    exif_offset = byteform.btousi(self.fp.read(4), big_endian = self.big_endian)
     self.exif   = exif.Exif(self.fp, exif_offset, offset, self.big_endian)
 
     # Get the IPTC block. The paylaod should simply be the encoded IPTC data

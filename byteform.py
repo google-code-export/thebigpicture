@@ -46,16 +46,29 @@ def itob(num, num_bytes, signed = False, big_endian = True):
   if (num < min_int_values[signed][num_bytes]) or (num > max_int_values[signed][num_bytes]):
     raise "The integer number falls outside the range for encoding!"
     
-  control_chars = __getIntControlChars(num_bytes, signed, big_endian)
+  control_chars = __getIntControlChars__(num_bytes, signed, big_endian)
   return struct.pack(control_chars, num)
-    
-def btoi(bytes, signed = False, big_endian = True):
-  """ Converts a string of bytes to its integer number. The string should
-      contain either 1, 2 or 4 bytes. """
-    
-  control_chars = __getIntControlChars(len(bytes), signed, big_endian)
-  return struct.unpack(control_chars, bytes)[0]
   
+def btousi(bytes, big_endian = True):
+  """ Convert a string of bytes to an unsigned integer. This function is
+      more efficient than btoi, but applicable to a smaller number of cases. """
+
+  num = 0
+  if (big_endian):
+    step = 1
+  else:
+    step = -1
+  for byte in bytes[::step]:
+    num = (num << 8) | ord(byte)
+  return num
+
+def btoi(bytes, signed = False, big_endian = True):
+  """ Convers a string of bytes to its integer number. The string should
+      contain either 1, 2 or 4 bytes. """
+  
+  control_chars = __getIntControlChars__(len(bytes), signed, big_endian)
+  return struct.unpack(control_chars, bytes)[0]
+
 def ftob(num, num_bytes, big_endian = True):
   """ Converts a floating point number to its IEEE representation. """
   
@@ -121,7 +134,7 @@ def btor(byte_str, signed = False, big_endian = True):
   
   return frac / denom
   
-def __getIntControlChars(length, signed, big_endian = True):
+def __getIntControlChars__(length, signed, big_endian = True):
   """ Chooses the format character for struct.(un)pack for integer numbers. """
   
   # Choose the format letter

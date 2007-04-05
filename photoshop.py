@@ -62,19 +62,19 @@ class Photoshop(datablock.DataBlock):
         break
 
       # The next two bytes specify the resource ID (tag number)
-      tag_num = byteform.btoi(self.read(2), big_endian = self.big_endian)
+      tag_num = byteform.btousi(self.read(2), big_endian = self.big_endian)
         
       # What then follows is the "Pascal string". The first byte determines its
       # length. If the total is an uneven number, it is padded with a \x00
       # character. We don't need this string, so we step over it. 
-      ps_len =  byteform.btoi(self.read(1), big_endian = self.big_endian)
+      ps_len =  byteform.btousi(self.read(1), big_endian = self.big_endian)
       if ((ps_len % 2) == 0):
         ps_len += 1
       self.read(ps_len)
         
       # Now it's getting interesting; the next four bytes determine the length
       # of the data
-      data_len = byteform.btoi(self.read(4), big_endian = self.big_endian)
+      data_len = byteform.btousi(self.read(4), big_endian = self.big_endian)
        
       # Store the byte position and data length in the tags dict
       self.tags[tag_num] = datablock.DataBlock(self.fp, self.byte_pos, data_len)

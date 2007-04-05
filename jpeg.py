@@ -123,11 +123,11 @@ class Segment(datablock.DataBlock):
       raise "Not a JPEG segment!"
       
     # The next byte determines the type number of the segment      
-    number = byteform.btoi(header[1], big_endian = self.big_endian)
+    number = byteform.btousi(header[1], big_endian = self.big_endian)
     
     # The next two bytes determine the length of the segment. We subtract two
     # because it includes these two bytes.
-    length = byteform.btoi(header[2:4], big_endian = self.big_endian) - 2
+    length = byteform.btousi(header[2:4], big_endian = self.big_endian) - 2
     
     return [number, length]
     

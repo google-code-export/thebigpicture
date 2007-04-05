@@ -153,14 +153,14 @@ class IFD(metainfofile.MetaInfoRecord):
     # number of fields in the IFD
     if (self.getDataLength() > 0) or (self.getDataLength() == None): # Parse when there's data, or when data size is unknown
       self.seek(0)
-      num_fields = byteform.btoi(self.read(2), big_endian = self.big_endian)
+      num_fields = byteform.btousi(self.read(2), big_endian = self.big_endian)
   
       for field_num in range(num_fields):
         # Read the type of the tag (number), the way the payload is stored, and
         # the length of the payload
-        tag_type    = byteform.btoi(self.read(2), big_endian = self.big_endian)
-        data_type   = byteform.btoi(self.read(2), big_endian = self.big_endian)
-        payload_len = byteform.btoi(self.read(4), big_endian = self.big_endian)
+        tag_type    = byteform.btousi(self.read(2), big_endian = self.big_endian)
+        data_type   = byteform.btousi(self.read(2), big_endian = self.big_endian)
+        payload_len = byteform.btousi(self.read(4), big_endian = self.big_endian)
   
         # The word width (number of bytes to encode one "character") of the
         # payload is determined by the data type. This needs to be multiplied by
@@ -173,7 +173,7 @@ class IFD(metainfofile.MetaInfoRecord):
           payload_offset = self.tell() + self.header_offset
           self.read(4)
         else:
-          payload_offset = byteform.btoi(self.read(4), big_endian = self.big_endian) + self.header_offset - self.ifd_offset
+          payload_offset = byteform.btousi(self.read(4), big_endian = self.big_endian) + self.header_offset - self.ifd_offset
 
         # Store the tag. This method does not check if we know the tag type, and
         # that's exactly what we want.

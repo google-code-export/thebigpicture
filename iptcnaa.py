@@ -102,19 +102,19 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
       
     while (start_byte == "\x1c"):
       # The next byte specifies the record number
-      record_num = byteform.btoi(self.read(1))
+      record_num = byteform.btousi(self.read(1))
       
       # Then follows the tag number
-      tag_type = byteform.btoi(self.read(1))
+      tag_type = byteform.btousi(self.read(1))
 
       # The next two bytes determine the payload length, or the length of the
       # fields specifying the payload length if we have an extended tag.
-      length = byteform.btoi(self.read(2), big_endian = self.big_endian)
+      length = byteform.btousi(self.read(2), big_endian = self.big_endian)
       # If the most significant bit is 1, we have an extended tag
       if (length & 32768): # 10000000 00000000
         # We have an extended tag
         length_count = length & 32767 # 01111111 11111111
-        length = byteform.btoi(self.read(length_count), big_endian = self.big_endian)
+        length = byteform.btousi(self.read(length_count), big_endian = self.big_endian)
 
       # Construct the tag and append it to the list
       tag_obj = datablock.DataBlock(self.fp, self.tell() + self.getDataOffset(), length)

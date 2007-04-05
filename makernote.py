@@ -40,7 +40,7 @@ class FujifilmIFD(ifd.IFD):
     if (header == None):
       mn_offset = 0
     elif (header == "FUJIFILM"):
-      mn_offset = byteform.btoi(block.read(4), big_endian = False)
+      mn_offset = byteform.btousi(block.read(4), big_endian = False)
     else:
       raise "No valid Fujifilm Makernote!"
       
