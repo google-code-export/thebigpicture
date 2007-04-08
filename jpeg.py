@@ -166,7 +166,10 @@ class Jpeg(metainfofile.MetaInfoFile):
       raise "No valid file parameter given -- file path or file object needed." 
     
     # Initialize values
-    self.comment = None
+    self.comment      = None
+    self.iptc_segment = None
+    self.ps_info      = None
+    self.exif_segment = None
     
     # For each segment of a certain type, we keep a list in the self.segments
     # dict.
@@ -241,11 +244,6 @@ class Jpeg(metainfofile.MetaInfoFile):
     # If we didn't find IPTC info, create an object and the containing structures
     if (self.iptc == None):
       self.iptc = iptcnaa.IPTC()
-    if (not self.iptc_segment):
-      self.iptc_segment = Segment(SEG_NUMS["APP13"])
-      self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
-    if (not self.ps_info):
-      self.ps_info = photoshop.Photoshop()
 
   def writeFile(self, file_path):
     # Open the new file for writing
@@ -257,7 +255,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     byte_str = "Exif\x00\x00"
     
     # Construct the Tiff header
-    ifd_big_endian = self.exif.big_endian
+    ifd_big_endian = self.__getExif__().big_endian
     if (ifd_big_endian):
       byte_str += "\x4d\x4d"
     else:
@@ -266,7 +264,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     byte_str += byteform.itob(8, 4, big_endian = ifd_big_endian)
     
     # Write the Exif data
-    byte_str += self.exif.getBlob(8)
+    byte_str += self.__getExif__().getBlob(8)
     
     # Put the Exif data into an appropriate APP1 segment. FIXME: This
     # invalidates that segment for future data extraction.
@@ -278,7 +276,12 @@ class Jpeg(metainfofile.MetaInfoFile):
     
     # Prepare the IPTC segment for writing. FIXME: This
     # invalidates that segment for future data extraction.
-    self.ps_info.setTag(1028, self.iptc.getBlob())
+    if (not self.iptc_segment):
+      self.iptc_segment = Segment(SEG_NUMS["APP13"])
+      self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
+    if (not self.ps_info):
+      self.ps_info = photoshop.Photoshop()
+    self.ps_info.setTag(1028, self.__getIPTC__().getBlob())
     self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
     
     # Iterate over all segments and copy them from the original file or rewrite

@@ -166,7 +166,7 @@ class Exif(metainfofile.MetaInfoBlock):
     
     # Query each record for the size
     for record in self.records.getList("record"):
-      if (record.hasTags()):
+      if (record) and (record.hasTags()):
         size += record.getSize()
       
     return size
@@ -177,11 +177,11 @@ class Exif(metainfofile.MetaInfoBlock):
         data offsets (usually this will be 8 bytes for the Tiff header). """
     
     # Retrieve the necessary IFD's
-    tiff      = self.getRecord("tiff")
-    exif      = self.getRecord("exif")
-    gps       = self.getRecord("gps")
-    interop   = self.getRecord("interop")
-    makernote = self.getRecord("makernote")
+    tiff      = self.getRecord(1)
+    exif      = self.getRecord(2)
+    gps       = self.getRecord(3)
+    interop   = self.getRecord(4)
+    makernote = self.getRecord(5)
     
     # Decide whether the tags pointing to other IFD's should be present. As we
     # don't know the offsets yet, we simply set them to zero. This procedure is

@@ -82,7 +82,7 @@ class Tiff(metainfofile.MetaInfoFile):
     # (see http://www.awaresystems.be/imaging/tiff/tifftags/iptc.html for more 
     # information.)
     
-    tiff_record = self.exif.getRecord(1)
+    tiff_record = self.__getExif__().getRecord(1)
     if (tiff_record):
       try:
         iptc_tag = tiff_record.fields[33723]
