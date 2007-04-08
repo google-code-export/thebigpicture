@@ -29,6 +29,11 @@ class MetaInfoBlock:
       - num:    the number of each record
       - name:   the name of each record
       - record: an instance of a MetaInfoRecord-derived class
+      There should also be the following method:
+      - getRecord(rec_num): Return the record with the specified record number.
+                            This class provides a basic method for that, but
+                            derived classes may override it to only load a
+                            record when requested.
       Furthermore, it should have a dict called DATA_TYPES, where the keys
       are the number of each data type, and the values a class to manipulate
       that particular kind of data.
@@ -112,7 +117,12 @@ class MetaInfoBlock:
       has_tags = has_tags or record.hasTags()
       
     return has_tags
+  
+  def getRecord(self, rec_num):
+    """ Return the record with the specified number. """
     
+    return self.records.query("num", rec_num, "record")
+
   def __getRecordNum__(self, record):
     """ Return the record number based on a record number or name. """
     
@@ -179,7 +189,6 @@ class MetaInfoRecord(datablock.DataBlock):
       - setTag(tag_num, payload): set the payload of the tag with the specified
                                   number.
       - removeTag(tag_num): remove the tag with the specified number.
-      - getRecord(rec_num): Return the record with the specified record number.
   """
   
   def getTagNum(self, tag):
