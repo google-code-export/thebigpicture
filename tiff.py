@@ -33,7 +33,7 @@ class Tiff(metainfofile.MetaInfoFile):
     
     # Initialize the file pointer
     if (type(file_indicator) == types.StringType):
-      self.fp = file(file_indicator)
+      self.fp = open(file_indicator, "rb")
     elif (type(file_indicator) == types.FileType):
       self.fp = file_indicator
     else:
@@ -98,7 +98,7 @@ class Tiff(metainfofile.MetaInfoFile):
           
   def writeFile(self, file_path):
     # Write the header
-    out_fp = file(file_path, "w")
+    out_fp = open(file_path, "wb")
     if (self.big_endian):
       out_fp.write("\x4d\x4d")
     else:

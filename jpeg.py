@@ -159,7 +159,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     
     # Initialize the file pointer
     if (type(file_indicator) == types.StringType):
-      self.fp = file(file_indicator)
+      self.fp = open(file_indicator, "rb")
     elif (type(file_indicator) == types.FileType):
       self.fp = file_indicator
     else:
@@ -247,7 +247,7 @@ class Jpeg(metainfofile.MetaInfoFile):
 
   def writeFile(self, file_path):
     # Open the new file for writing
-    out_fp = file(file_path, "w")
+    out_fp = open(file_path, "wb")
     out_fp.write("\xff\xd8")
     
     # Prepare the Exif segment for writing
