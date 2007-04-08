@@ -63,15 +63,8 @@ class DataBlock:
     if (seek != None): # Explicit test, because 0 is a valid value 
       self.seek(seek)
 
-    if (num_bytes != None):
-      # Check if we can do the reading
-      length = self.getDataLength()
-      if (length) and ((self.byte_pos + num_bytes) > length):
-        raise IOError, "Attempt to read beyond the size of the data block!"
-
     # Read the bytes from either file or string
     if (self.fp) and (self.data_offset):
-      self.fp.seek(self.data_offset + self.byte_pos)
       if (num_bytes == None):
         if (self.length):
           num_bytes = self.length - self.byte_pos
@@ -98,6 +91,8 @@ class DataBlock:
       raise IOError, "Trying to seek outside data block."
     else:
       self.byte_pos = position
+      if (self.fp) and (self.data_offset):
+        self.fp.seek(self.data_offset + self.byte_pos)
 
   def getData(self):
     """ Return the data blob. """
