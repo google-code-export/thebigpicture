@@ -38,15 +38,17 @@ class Tiff(metainfofile.MetaInfoFile):
       self.fp = file_indicator
     else:
       raise "No valid file parameter given -- file path or file object needed." 
-      
+    
+    self.offset = offset
+    
     # Parse the header
-    self.parseFile(offset)
+    self.parseHeader()
       
-  def parseFile(self, offset):
+  def parseHeader(self):
     """Parse the header of the Tiff file, starting ot the byte offset."""
     
     is_tiff = False
-    self.fp.seek(offset)
+    self.fp.seek(self.offset)
     
     # Read the header
     data = self.fp.read(2)
@@ -65,21 +67,33 @@ class Tiff(metainfofile.MetaInfoFile):
     if not(is_tiff):
       raise "File is not Tiff"
     
+    # Locate the Exif data
+    self.exif_offset = byteform.btousi(self.fp.read(4), big_endian = self.big_endian)
+    
+  def loadExif(self):
     # Read the Exif data
-    exif_offset = byteform.btousi(self.fp.read(4), big_endian = self.big_endian)
-    self.exif   = exif.Exif(self.fp, exif_offset, offset, self.big_endian)
+    self.exif = exif.Exif(self.fp, self.exif_offset, self.offset, self.big_endian)
 
+  def loadIPTC(self):
     # Get the IPTC block. The paylaod should simply be the encoded IPTC data
     # (datatype UNDEFINED or BYTE), but in reality it often is set as long,
     # where the number points to the absolute offset in the file. We have to
-    # work around this restricition. (see http://www.awaresystems.be/imaging/tiff/tifftags/iptc.html
-    # for more information.
-    try:
-      iptc_tag = self.exif.records.query("num", 1, "record").fields[33723]
-      iptc_offset = iptc_tag.getDataOffset()
-      #iptc_length = iptc_tag.getDataLength()
-      self.iptc = iptcnaa.IPTC(self.fp, iptc_offset) 
-    except KeyError:
+    # work around this restricition.
+    # (see http://www.awaresystems.be/imaging/tiff/tifftags/iptc.html for more 
+    # information.)
+    
+    tiff_record = self.exif.getRecord(1)
+    if (tiff_record):
+      try:
+        iptc_tag = tiff_record.fields[33723]
+        iptc_offset = iptc_tag.getDataOffset()
+        #iptc_length = iptc_tag.getDataLength()
+        self.iptc = iptcnaa.IPTC(self.fp, iptc_offset) 
+      except KeyError:
+        pass
+    
+    # If we failed to load IPTC data, create an empty IPTC object
+    if (self.iptc == None):
       self.iptc = iptcnaa.IPTC()
           
   def writeFile(self, file_path):
@@ -101,7 +115,7 @@ class Tiff(metainfofile.MetaInfoFile):
 
     # Restructure the Exif metadata to contain the new strip offsets
     curr_offset = self.exif.getSize() + 8 # 8 bytes for the Tiff header
-    tiff = self.exif.records.query("name", "tiff", "record")
+    tiff = self.exif.getRecord(1)
     strip_lengths = self.exif.getTag("StripByteCounts")
     new_strip_offsets = []
     for length in strip_lengths:

@@ -208,19 +208,28 @@ class Jpeg(metainfofile.MetaInfoFile):
         segment.getDataOffset() + segment.getDataLength()
         self.fp.seek(segment.getDataOffset() + segment.getDataLength()) 
     
+  def loadExif(self):
+    """ Load the Exif data from the file. """
+    
     # Try to find the Exif data. It should be in one off the APP1 segments,
     # marked by "Exif\x00\x00"
     for seg in self.segments[SEG_NUMS["APP1"]]:
       if (seg.read(6, 0) == "Exif\x00\x00"):
         self.exif_segment = seg
         tiff_block = tiff.Tiff(self.fp, seg.getDataOffset() + 6) # 6 bytes Exif marker
+        tiff_block.loadExif()
+        tiff_block.loadIPTC()
         self.exif = tiff_block.exif
-        self.iptc = tiff_block.iptc
+        if (tiff_block.iptc.hasTags()): # FIXME: Dunno if this is actually possible
+          self.iptc = tiff_block.iptc
         break
 
+  def loadIPTC(self):
+    """ Load the IPTC data from the file. """
+    
     # If the IPTC info wasn't encoded in the Tiff IFD, we can look for it in
     # APP13 (Photoshop data) (0xED)
-    if (not self.iptc.hasTags()):
+    if (self.iptc == None):
       for seg in self.segments[SEG_NUMS["APP13"]]:
         if (seg.read(14, 0) == "Photoshop 3.0\x00"):
           ps = photoshop.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
@@ -229,13 +238,15 @@ class Jpeg(metainfofile.MetaInfoFile):
             self.ps_info      = ps
             self.iptc = iptcnaa.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
     
-    # If we didn't find IPTC info, create the containing structures
+    # If we didn't find IPTC info, create an object and the containing structures
+    if (self.iptc == None):
+      self.iptc = iptcnaa.IPTC()
     if (not self.iptc_segment):
       self.iptc_segment = Segment(SEG_NUMS["APP13"])
       self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
     if (not self.ps_info):
       self.ps_info = photoshop.Photoshop()
-  
+
   def writeFile(self, file_path):
     # Open the new file for writing
     out_fp = file(file_path, "w")

@@ -38,7 +38,9 @@ class MetaInfoBlock:
     """ Return the tag data with the specified number from the specified record.
     """
     
-    # Get the record and tag numbers
+    # Get the official record and tag numbers
+    tag_num    = None
+    record_num = None
     try:
       record_num, tag_num = self.__getRecordAndTagNum__(tag, record)
     except KeyError:
@@ -58,7 +60,10 @@ class MetaInfoBlock:
         gt_args.append(tag_num)
         
       # Retrieve the data
-      data = self.records.query("num", record_num, "record").getTag(*gt_args)
+      data = False
+      record = self.getRecord(record_num)
+      if (record):
+        data = record.getTag(*gt_args)
       return data
       
     return None
@@ -86,16 +91,18 @@ class MetaInfoBlock:
 
     # Set the data.
     if (rec_num):
-      self.records.query("num", rec_num, "record").setTag(tag_num, payload, check, data_type, data_count, data)
+      self.getRecord(rec_num).setTag(tag_num, payload, check, data_type, data_count, data)
   
   def removeTag(self, tag, record = None):
     """ Remove the tag with the specified name or number from the strucrure. """
     # Get the record and tag number
     rec_num, tag_num = self.__getRecordAndTagNum__(tag, record)
     
-    # Set the data.
+    # Remove the tag
     if (rec_num):
-      self.records.query("num", rec_num, "record").removeTag(tag_num)
+      record = self.getRecord(rec_num)
+      if (record):
+        record.removeTag(tag_num)
     
   def hasTags(self):
     """ Returns True of the structure has any tags set, or False otherwise. """
@@ -126,10 +133,10 @@ class MetaInfoBlock:
       raise TyepError, "I can't make sense of an record of type %s!" % type(record)
 
   def __getRecordAndTagNum__(self, tag, record = None):
-    """ Return the record number and tag number for the supplied tag number or
-        name in the specified record name or number. If record is omitted, the
-        method will search in all records and raise an error if ambiguousnesses
-        are found. """
+    """ Return the record number and tag number for the supplied tag (name or
+        number) in the specified record (name or number). If record is omitted,
+        the method will search in all records and raise an error if
+        ambiguousnesses are found. """
       
     # If the user didn't specify a record, we search through all records
     if (record == None):
@@ -141,9 +148,11 @@ class MetaInfoBlock:
     # Find the possible records
     found_records = []
     for rec_num in records:
-      tag_num = self.records.query("num", rec_num, "record").getTagNum(tag)
-      if (tag_num is not False):
-        found_records.append([rec_num, tag_num])
+      record = self.getRecord(rec_num)
+      if (record):
+        tag_num = self.getRecord(rec_num).getTagNum(tag)
+        if (tag_num is not False):
+          found_records.append([rec_num, tag_num])
 
     # Warn if the tag occurs in multiple records
     if (len(found_records) == 0):
@@ -170,10 +179,11 @@ class MetaInfoRecord(datablock.DataBlock):
       - setTag(tag_num, payload): set the payload of the tag with the specified
                                   number.
       - removeTag(tag_num): remove the tag with the specified number.
+      - getRecord(rec_num): Return the record with the specified record number.
   """
   
   def getTagNum(self, tag):
-    """ Returns a tag number when fed a tag number or name, or False if it
+    """ Return a tag number when fed a tag number or name, or False if it
         doesn't exist within the current record. """
     
     tag_num = False
@@ -203,20 +213,19 @@ class MetaInfoRecord(datablock.DataBlock):
     return (len(self.fields) > 0)
 
 class MetaInfoFile:
-  """The base class for files containing meta information."""
+  """ The base class for files containing meta information. """
   
   def __init__(self):
+    # While Exif and IPTC are not yet loaded, they are None
     self.exif = None
-    self.IPTC = None
+    self.iptc = None
     
   def getExifTag(self, tag, record = None):
     """ Return the payload of the Exif tag with the specified name or number, or
         False if it doesn't exit. The optional record parameter specifies the
         name or number of the record where the tag belongs. """
     
-    if (self.exif):
-      return self.exif.getTag(tag, record)
-    return False
+    return self.__getExif__().getTag(tag, record)
       
   def setExifTag(self, tag, payload = None, record = None, check = True, data_type = None, count = None, data = None):
     """ Set the specified Exif tag name or number. Usually the payload parameter
@@ -231,15 +240,13 @@ class MetaInfoFile:
         given for sanity checking.
     """
         
-    if (self.exif):
-      self.exif.setTag(tag, payload, record, check, data_type, count, data)
+    self.__getExif__().setTag(tag, payload, record, check, data_type, count, data)
   
   def delExifTag(self, tag, record = None):
     """ Remove the Exif tag with the specified name or number. The optional
         record parameter specifies the name or number of the record where the
         tag belongs. """
-    if (self.exif):
-      self.exif.removeTag(tag, record)
+    self.__getExif__().removeTag(tag, record)
     
   def getIPTCTag(self, tag, record = None, data_type = None):
     """ Return the payload of the IPTC tag or tags with the specified name or
@@ -248,10 +255,8 @@ class MetaInfoFile:
         optional data_type arguments is needed when the tag is unknown in the
         internal libraries, and used to decode the data. """
     
-    if (self.iptc):
-      return self.iptc.getTag(tag, record, data_type)
-    return False
-
+    return self.__getIPTC__().getTag(tag, record, data_type)
+    
   def setIPTCTag(self, tag, payload = None, record = None, check = True, data_type = None, count = None, data = None):
     """ Set the specified IPTC tag name or number. Usually the payload parameter
         specifies the unencoded payload that needs to be set. Alternatively,
@@ -265,21 +270,40 @@ class MetaInfoFile:
         given for sanity checking.
     """
         
-    if (self.iptc):
-      self.iptc.setTag(tag, payload, record, check, data_type, count, data)
+    self.__getIPTC__().setTag(tag, payload, record, check, data_type, count, data)
 
   def appendIPTCTag(self, tag, payload, record = None):
     """ Append the payload to the alreadyd defined IPTC tags with the specified
         name or number. The optional record parameter specifies the name or
         number of the record where the tag belongs. """
         
-    if (self.iptc):
-      self.iptc.appendTag(tag, payload, record = record)
+    self.__getIPTC__().appendTag(tag, payload, record = record)
       
   def delIPTCTag(self, tag, record = None):
     """ Remove the IPTC tag or tags with the specified name or number. The 
         optional record parameter specifies the name or number of the record
         where the tag belongs. """
         
-    if (self.iptc):
-      self.iptc.removeTag(tag, record)
+    self.__getIPTC__().removeTag(tag, record)
+      
+  def __getExif__(self):
+    """ Return the file's Exif object. If it's not loaded yet, this method loads
+        it from disk. By using this method rather the self.exif, it is possible
+        to load the Exif data only when requested, which results in a better
+        speed. """
+        
+    if (self.exif == None):
+      self.loadExif()
+      
+    return self.exif
+
+  def __getIPTC__(self):
+    """ Return the file's IPTC/NAA object. If it's not loaded yet, this method 
+        loads it from disk. By using this method rather the self.exif, it is
+        possible to load the IPTC/NAA data only when requested, which results in
+        a better speed. """
+    
+    if (self.iptc == None):
+      self.loadIPTC()
+      
+    return self.iptc

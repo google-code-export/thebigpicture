@@ -131,6 +131,11 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
       except IOError:
         break
 
+  def getRecord(self, rec_num):
+    """ Return the record with the specified number. """
+    
+    return self.records.query("num", rec_num, "record")
+    
   def getBlob(self):
     """ Return the entire IPTC record as binary data blob. """
     
