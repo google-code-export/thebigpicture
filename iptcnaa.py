@@ -76,7 +76,7 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
     self.big_endian = big_endian
     
     # Call the DataBlock constructor
-    datablock.DataBlock.__init__(self, **{"fp": fp, "offset": offset, "length": length, "data": data})
+    datablock.DataBlock.__init__(self, fp = fp, offset = offset, length = length, data = data)
       
     # We keep an internal map of all the records
     self.records = qdb.QDB()
@@ -84,22 +84,30 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
     self.records.addList("name", ["IPTCEnvelope", "IPTCApplication", "IPTCNewsPhoto", "IPTCPreObjectData", "IPTCObjectData", "IPTCPostObjectData"])
     self.records.addList("record", [IPTCEnvelope(big_endian = big_endian), IPTCApplication(big_endian = big_endian), IPTCNewsPhoto(big_endian = big_endian), IPTCPreObjectData(big_endian = big_endian), IPTCObjectData(big_endian = big_endian), IPTCPostObjectData(big_endian = big_endian)])
 
-    # Parse the file
-    self.parse()
+    # Remember if we have already parsed the data
+    self.parsed = False
+
+  def getRecord(self, rec_num):
+    """ Return the record with the specified number. """
     
+    if (not self.parsed):
+      self.parse()
+    
+    return self.records.query("num", rec_num, "record")
+
   def parse(self):
     """ Parse the IPTC block. """
     
     # The IPTC data is structured in a very simple way; as a lineary stream of
     # tags and the associated data. Tags can belong to different segments, but
     # this segment number is simply written in front of each tag.
-    
+
     #Each tag starts with the bye 0x1C
     try:
       start_byte = self.read(1)
     except IOError:
       start_byte = None
-      
+
     while (start_byte == "\x1c"):
       # The next byte specifies the record number
       record_num = byteform.btousi(self.read(1))
@@ -130,6 +138,8 @@ class IPTC(metainfofile.MetaInfoBlock, datablock.DataBlock):
         start_byte = self.read(1)
       except IOError:
         break
+        
+    self.parsed = True
     
   def getBlob(self):
     """ Return the entire IPTC record as binary data blob. """

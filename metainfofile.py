@@ -111,17 +111,15 @@ class MetaInfoBlock:
     
   def hasTags(self):
     """ Returns True of the structure has any tags set, or False otherwise. """
-    
-    has_tags = False
-    for record in self.records.getList("record"):
-      has_tags = has_tags or record.hasTags()
-      
-    return has_tags
-  
-  def getRecord(self, rec_num):
-    """ Return the record with the specified number. """
-    
-    return self.records.query("num", rec_num, "record")
+
+    # Loop over each record (load it if needed) and return True if one of them
+    # has tags set.
+    for rec_num in self.records.getList("num"):
+      record = self.getRecord(rec_num)
+      if (record and record.hasTags()):
+        return True
+     
+    return False
 
   def __getRecordNum__(self, record):
     """ Return the record number based on a record number or name. """
@@ -314,5 +312,5 @@ class MetaInfoFile:
     
     if (self.iptc == None):
       self.loadIPTC()
-      
+
     return self.iptc

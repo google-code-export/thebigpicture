@@ -240,8 +240,9 @@ class Jpeg(metainfofile.MetaInfoFile):
             self.iptc_segment = seg
             self.ps_info      = ps
             self.iptc = iptcnaa.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
-    
-    # If we didn't find IPTC info, create an object and the containing structures
+
+    # If we didn't find IPTC info, create an empty object and the containing
+    # structures
     if (self.iptc == None):
       self.iptc = iptcnaa.IPTC()
 
@@ -268,21 +269,36 @@ class Jpeg(metainfofile.MetaInfoFile):
     
     # Put the Exif data into an appropriate APP1 segment. FIXME: This
     # invalidates that segment for future data extraction.
-    if (not self.exif_segment):
-      self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
-      self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
+    exif = self.__getExif__()
+    if (exif.hasTags()): # FIXME: Tags aren't loaded by default anymore
+      if (not self.exif_segment):
+        self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
+        self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
+      else:
+        self.exif_segment.setData(byte_str)
     else:
-      self.exif_segment.setData(byte_str)
+      if (self.exif_segment):
+        del self.segments[SEG_NUMS[APP1]][self.segments[SEG_NUMS[APP1]].index(self.exif_segment)]
+        self.exif_segment = None
     
     # Prepare the IPTC segment for writing. FIXME: This
     # invalidates that segment for future data extraction.
-    if (not self.iptc_segment):
-      self.iptc_segment = Segment(SEG_NUMS["APP13"])
-      self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
-    if (not self.ps_info):
-      self.ps_info = photoshop.Photoshop()
-    self.ps_info.setTag(1028, self.__getIPTC__().getBlob())
-    self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
+    iptc = self.__getIPTC__()
+    if (iptc.hasTags()):
+      if (not self.iptc_segment):
+        self.iptc_segment = Segment(SEG_NUMS["APP13"])
+        self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
+      if (not self.ps_info):
+        self.ps_info = photoshop.Photoshop()
+      self.ps_info.setTag(1028, self.__getIPTC__().getBlob())
+      self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
+    # If we don't have any tags, remove the IPTC segment and Photoshop info
+    else:
+      if (self.iptc_segment):
+        del self.segments[SEG_NUMS["APP13"]][self.segments[SEG_NUMS["APP13"]].index(self.iptc_segment)]
+        self.iptc_segment = None
+      if (self.ps_info):
+        self.ps_info = None
     
     # Iterate over all segments and copy them from the original file or rewrite
     # them.

@@ -59,9 +59,11 @@ class DataBlock:
     
     data = None
 
-    # Seek to the specified position
-    if (seek != None): # Explicit test, because 0 is a valid value 
-      self.seek(seek)
+    # Seek to the specified position, or otherwise make sure we're in the right
+    # position
+    if (seek == None): # Explicit test, because 0 is a valid value 
+      seek = self.byte_pos
+    self.seek(seek)
 
     # Read the bytes from either file or string
     if (self.fp) and (self.data_offset):

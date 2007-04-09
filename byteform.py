@@ -90,31 +90,36 @@ def rtob(num, num_bytes, signed = False, big_endian = True):
 
   num_bytes /= 2
   
-  # First, find out the multiplier and denominator to get a fraction between 1
-  # and 10, or stop when it gets too large. In this case, the number is too
-  # small and we simply set it to 0.
-  max_num    = max_int_values[signed][num_bytes]
-  too_small  = False
-  multiplier = 1.0
-  while (abs(num * multiplier) < 1):
-    multiplier *= 10
-    if ((multiplier * num) > max_num):
-      multiplier /= 10
-      too_small = True
-      break
-
-  # Then, search for a multiplier where dividing the fraction on the denominator
-  # produces the number, or stop when it gets too large
-  while (float(long(num * multiplier) / multiplier) != num) and ((multiplier * num)> (max_num / 10)):
-    multiplier *= 10
-    
-  # Calculate the fraction, and set the denominator to the multiplier 
-  if (too_small):
+  # If we should encode 0, fraction should be 0, denominator should be 1
+  if (num == 0.0):
     frac  = 0
     denom = 1
   else:
-    frac  = int(num * multiplier)
-    denom = int(multiplier)
+    # First, find out the multiplier and denominator to get a fraction between 1
+    # and 10, or stop when it gets too large. In this case, the number is too
+    # small and we simply set it to 0.
+    max_num    = max_int_values[signed][num_bytes]
+    too_small  = False
+    multiplier = 1.0
+    while (abs(num * multiplier) < 1):
+      multiplier *= 10
+      if ((multiplier * num) > max_num):
+        multiplier /= 10
+        too_small = True
+        break
+  
+    # Then, search for a multiplier where dividing the fraction on the denominator
+    # produces the number, or stop when it gets too large
+    while (float(long(num * multiplier) / multiplier) != num) and ((multiplier * num)> (max_num / 10)):
+      multiplier *= 10
+      
+    # Calculate the fraction, and set the denominator to the multiplier 
+    if (too_small):
+      frac  = 0
+      denom = 1
+    else:
+      frac  = int(num * multiplier)
+      denom = int(multiplier)
     
   # Create the byte stream
   byte_str =  itob(frac, num_bytes, signed, big_endian)
