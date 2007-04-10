@@ -270,7 +270,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     # Put the Exif data into an appropriate APP1 segment. FIXME: This
     # invalidates that segment for future data extraction.
     exif = self.__getExif__()
-    if (exif.hasTags()): # FIXME: Tags aren't loaded by default anymore
+    if (exif.hasTags()):
       if (not self.exif_segment):
         self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
         self.segments[SEG_NUMS[APP1]].append(self.exif_segment)

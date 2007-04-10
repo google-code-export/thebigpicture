@@ -110,9 +110,9 @@ def rtob(num, num_bytes, signed = False, big_endian = True):
   
     # Then, search for a multiplier where dividing the fraction on the denominator
     # produces the number, or stop when it gets too large
-    while (float(long(num * multiplier) / multiplier) != num) and ((multiplier * num)> (max_num / 10)):
+    while (float(long(num * multiplier) / multiplier) != num) and ((multiplier * num) < (max_num / 10)):
       multiplier *= 10
-      
+
     # Calculate the fraction, and set the denominator to the multiplier 
     if (too_small):
       frac  = 0
@@ -120,7 +120,7 @@ def rtob(num, num_bytes, signed = False, big_endian = True):
     else:
       frac  = int(num * multiplier)
       denom = int(multiplier)
-    
+  
   # Create the byte stream
   byte_str =  itob(frac, num_bytes, signed, big_endian)
   byte_str += itob(denom, num_bytes, signed, big_endian)
