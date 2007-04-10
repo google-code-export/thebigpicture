@@ -57,13 +57,6 @@ class InteropIFD(ifd.IFD):
   tags.addList("data_type", [])
   tags.addList("count", [])
 
-class IFD1(ifd.IFD):
-  tags = qdb.QDB()
-  tags.addList("name", [])
-  tags.addList("num", [])
-  tags.addList("data_type", [])
-  tags.addList("count", [])
-
 MAKERNOTES = {
   "Canon":          makernote.CanonIFD,
   "FUJIFILM":       makernote.FujifilmIFD,
@@ -154,9 +147,9 @@ class Exif(metainfofile.MetaInfoBlock):
         elif (rec_num == 6):
           ifd1_offset = tiff.next_ifd_offset
           if (ifd1_offset):
-            rec_obj = IFD1(self.fp, ifd1_offset, self.header_offset, big_endian = self.big_endian)
+            rec_obj = TiffIFD(self.fp, ifd1_offset, self.header_offset, big_endian = self.big_endian)
           else:
-            rec_obj = IFD1(big_endian = self.big_endian)
+            rec_obj = TiffIFD(big_endian = self.big_endian)
 
       # Interop
       elif (rec_num == 4):
@@ -184,7 +177,7 @@ class Exif(metainfofile.MetaInfoBlock):
         size += record.getSize()
       
     return size
-    
+  
   def getBlob(self, offset = 0):
     """ Return the encoded Tiff, Exif, GPS, and Interoperability IFD's as a
         block. The offset specifies the offset that needs to be added to all
@@ -244,6 +237,9 @@ class Exif(metainfofile.MetaInfoBlock):
       curr_offset += interop.getSize()
     if (ifd1.hasTags()):
       ifd1_offset = curr_offset
+      thumbnail_offset = curr_offset + ifd1.getSize()
+      tn_data = self.getThumbnail() # Let's do this before we start messing with the ifd
+      ifd1.setTag(513, thumbnail_offset)
       
     # Write the Exif IFD's
     byte_str = tiff.getBlob(offset, ifd1_offset)
@@ -254,7 +250,24 @@ class Exif(metainfofile.MetaInfoBlock):
     if (interop.hasTags()):
       byte_str += interop.getBlob(interop_offset)
     if (ifd1.hasTags()):
-      print ifd1_offset
       byte_str += ifd1.getBlob(ifd1_offset)
+      byte_str += tn_data
 
     return byte_str
+
+  def getThumbnail(self):
+    """ Returns the thumbnail stored in the Exif structure, or None if it's
+        not present. """
+        
+    data = None
+    
+    # Load the IFD1
+    ifd1 = self.getRecord(6)
+    if (ifd1 != False):
+      offset = ifd1.getTag(513) # JPEGInterchangeFormat
+      length = ifd1.getTag(514) # JPEGInterchangeFormatLength
+      self.fp.seek(self.header_offset + offset)
+      data = self.fp.read(length)
+      
+    return data
+      

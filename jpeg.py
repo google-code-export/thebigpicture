@@ -70,7 +70,7 @@ class Segment(datablock.DataBlock):
   def __init__(self, *args, **kwargs):
     """ The segment can be initialized in three forms:
         - With a file pointer and offset in this file to the start of the
-          segment (the 0xFF0xXX part).
+          segment (the 0xFF 0xXX part).
         - With a data stream
         - With a segment number
     """

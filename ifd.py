@@ -119,7 +119,9 @@ class IFD(metainfofile.MetaInfoRecord):
   larger part (APP1 for example). Offsets in an IFD are measured from this
   number. This class functions as a base class.
   Derived classes need to specify a QDB called tags, which holds the names,
-  numbers, data types and counts for each tag. """
+  numbers, data types and counts for each tag.
+  After loading, the class has a variable called next_ifd_offset, which 
+  specifies the read offset to the next IFD. """
 
   # The data types we know of
   DATA_TYPES = DATA_TYPES
