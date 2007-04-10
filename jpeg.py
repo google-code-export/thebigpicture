@@ -205,8 +205,7 @@ class Jpeg(metainfofile.MetaInfoFile):
         
       # Otherwise, seek to the next segment.
       # WARNING: the value needs to be absolute, because the Segment class does
-      # some file seeking too! The 2 is for the 2 bytes specifying the segment
-      # length.
+      # some file seeking too!
       else:
         self.fp.seek(segment.getDataOffset() + segment.getDataLength()) 
     
@@ -309,7 +308,7 @@ class Jpeg(metainfofile.MetaInfoFile):
         
     # Write the image data, which starts after the SOS segment
     segment = self.segments[SEG_NUMS["SOS"]][-1]
-    self.fp.seek(segment.data_offset + segment.getDataLength() + 2)
+    self.fp.seek(segment.getDataOffset() + segment.getDataLength())
     out_fp.write(self.fp.read())
     
     out_fp.close()

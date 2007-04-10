@@ -238,7 +238,7 @@ class Exif(metainfofile.MetaInfoBlock):
     if (ifd1.hasTags()):
       ifd1_offset = curr_offset
       thumbnail_offset = curr_offset + ifd1.getSize()
-      tn_data = self.getThumbnail() # Let's do this before we start messing with the ifd
+      tn_data = self.getThumbnail() # Let's load this before we start messing with the ifd
       ifd1.setTag(513, thumbnail_offset)
       
     # Write the Exif IFD's
@@ -256,7 +256,7 @@ class Exif(metainfofile.MetaInfoBlock):
     return byte_str
 
   def getThumbnail(self):
-    """ Returns the thumbnail stored in the Exif structure, or None if it's
+    """ Return the thumbnail stored in the Exif structure, or None if it's
         not present. """
         
     data = None
