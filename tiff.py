@@ -111,17 +111,17 @@ class Tiff(metainfofile.MetaInfoFile):
       self.exif.setTag(33723, self.iptc.getBlob(), record = 1)
       
     # Save the old strip offsets before we overwrite it
-    old_strip_offsets = self.exif.getTag("StripOffsets")
+    old_strip_offsets = self.__getExif__().getTag("StripOffsets", 1)
 
     # Restructure the Exif metadata to contain the new strip offsets
     curr_offset = self.exif.getSize() + 8 # 8 bytes for the Tiff header
     tiff = self.exif.getRecord(1)
-    strip_lengths = self.exif.getTag("StripByteCounts")
+    strip_lengths = self.exif.getTag("StripByteCounts", 1)
     new_strip_offsets = []
     for length in strip_lengths:
       new_strip_offsets.append(curr_offset)
       curr_offset += length
-    self.exif.setTag("StripOffsets", new_strip_offsets)
+    self.exif.setTag("StripOffsets", new_strip_offsets, 1)
 
     # Write the Exif data
     out_fp.write(self.exif.getBlob(8))

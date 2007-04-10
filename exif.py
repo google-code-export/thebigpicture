@@ -27,7 +27,7 @@ class TiffIFD(ifd.IFD):
   tags.addList("num",       [256, 257, 258, 259, 262, 270, 271, 272, 273, 274, 277, 278, 279, 282, 283, 284, 296, 301, 305, 306, 315, 318, 319, 513, 514, 529, 530, 531, 532, 33723, 33432, 34665, 34853])
   tags.addList("data_type", [[3, 4], [3, 4], 3, 3, 3, 2,     2,     2,     [3, 4], 3, 3, [3, 4], [3, 4], 5, 5, 3, 3, 3,  2,     2,  2,     5, 5, 4, 4, 5, 3, 3, 5, 7, 2,     4, 4])
   # -1 means special, False means any.
-  tags.addList("count",     [1,      1,      3, 1, 1, False, False, False, -1,     1, 1, 1,      -1,     1, 1, 1, 1, -1, False, 19, False, 2, 6, 1, 1, 3, 2, 1, 6, 1, False, 1, 1])
+  tags.addList("count",     [1,      1,      3, 1, 1, False, False, False, -1,     1, 1, 1,      -1,     1, 1, 1, 1, -1, False, 19, False, 2, 6, 1, 1, 3, 2, 1, 6, False, False, 1, 1])
   #  required = [256, 257, 258, 259, 262, 273, 277, 278, 279, 282, 283, 296, 34665]
 
 class ExifIFD(ifd.IFD):
@@ -220,8 +220,10 @@ class Exif(metainfofile.MetaInfoBlock):
     else:
       tiff.removeTag(34853)
 
+    ifd1_offset = 0
+    
     # Now that we can determine the size of each IFD, determine their offsets
-    # and store them in the appropriate tags.
+    # and store them in the appropriate tags.    
     curr_offset = offset + tiff.getSize()
     if (exif.hasTags()):
       exif_offset = curr_offset
