@@ -57,6 +57,13 @@ class InteropIFD(ifd.IFD):
   tags.addList("data_type", [])
   tags.addList("count", [])
 
+class IFD1(ifd.IFD):
+  tags = qdb.QDB()
+  tags.addList("name", [])
+  tags.addList("num", [])
+  tags.addList("data_type", [])
+  tags.addList("count", [])
+
 MAKERNOTES = {
   "Canon":          makernote.CanonIFD,
   "FUJIFILM":       makernote.FujifilmIFD,
@@ -80,11 +87,11 @@ class Exif(metainfofile.MetaInfoBlock):
     # Create the database of segment data
     self.records = qdb.QDB()
     # The segment numbers, although Exif does not have an official numbering
-    self.records.addList("num", [1, 2, 3, 4, 5])
+    self.records.addList("num", [1, 2, 3, 4, 5, 6])
     # The segment names
-    self.records.addList("name", ["tiff", "exif", "gps", "interop", "makernote"])
+    self.records.addList("name", ["tiff", "exif", "gps", "interop", "makernote", "ifd1"])
     # The individual IFD's. None means not loaded.
-    self.records.addList("record", [None, None, None, None, None])
+    self.records.addList("record", [None, None, None, None, None, None])
 
   def getRecord(self, rec_num):
     """ Returns the record object with the requested number. If its not loaded
@@ -100,8 +107,8 @@ class Exif(metainfofile.MetaInfoBlock):
       if (rec_num == 1):
         rec_obj = TiffIFD(self.fp, self.ifd_offset, self.header_offset, big_endian = self.big_endian)
         
-      elif (rec_num in [2, 3, 5]):
-        # For Exif, GPS and Makernote, the Tiff structure is needed
+      elif (rec_num in [2, 3, 5, 6]):
+        # For Exif, GPS, Makernote and IFD1, the Tiff structure is needed
         tiff = self.getRecord(1)
         
         # Exif
@@ -142,7 +149,15 @@ class Exif(metainfofile.MetaInfoBlock):
                   pass
               if not (rec_obj):
                 rec_obj = MAKERNOTES[make](big_endian = self.big_endian)
-      
+                
+        # IFD1
+        elif (rec_num == 6):
+          ifd1_offset = tiff.next_ifd_offset
+          if (ifd1_offset):
+            rec_obj = IFD1(self.fp, ifd1_offset, self.header_offset, big_endian = self.big_endian)
+          else:
+            rec_obj = IFD1(big_endian = self.big_endian)
+
       # Interop
       elif (rec_num == 4):
         exif = self.getRecord(2)
@@ -181,6 +196,7 @@ class Exif(metainfofile.MetaInfoBlock):
     gps       = self.getRecord(3)
     interop   = self.getRecord(4)
     makernote = self.getRecord(5)
+    ifd1      = self.getRecord(6)
 
     # Decide whether the tags pointing to other IFD's should be present. As we
     # don't know the offsets yet, we simply set them to zero. This procedure is
@@ -188,7 +204,7 @@ class Exif(metainfofile.MetaInfoBlock):
     # offsets).
     
     # Interopability and Makernote IFD's need to go first, since they are stored
-    # in the Exif IFD, which may be empty or not depending on the prescence of 
+    # in the Exif IFD, which may be empty or not depending on the presence of 
     # these data.
     if (makernote) and (makernote.hasTags()):
       exif.setTag(37500, makernote.getBlob(0))
@@ -225,14 +241,20 @@ class Exif(metainfofile.MetaInfoBlock):
     if (interop.hasTags()):
       interop_offset = curr_offset
       exif.setTag(40965, interop_offset)
+      curr_offset += interop.getSize()
+    if (ifd1.hasTags()):
+      ifd1_offset = curr_offset
       
     # Write the Exif IFD's
-    byte_str = tiff.getBlob(offset)
+    byte_str = tiff.getBlob(offset, ifd1_offset)
     if (exif.hasTags()):
       byte_str += exif.getBlob(exif_offset)
     if (gps.hasTags()):
       byte_str += gps.getBlob(gps_offset)
     if (interop.hasTags()):
       byte_str += interop.getBlob(interop_offset)
-      
+    if (ifd1.hasTags()):
+      print ifd1_offset
+      byte_str += ifd1.getBlob(ifd1_offset)
+
     return byte_str

@@ -33,7 +33,7 @@ class FujifilmIFD(ifd.IFD):
   tags.addList("data_type", [])
   tags.addList("count", [])
 
-  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
+  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = False):
     # Fujifilm always uses little endian
     block = datablock.DataBlock(fp = file_pointer, offset = ifd_offset + header_offset, data = data)
     header = block.read(8)
@@ -45,16 +45,44 @@ class FujifilmIFD(ifd.IFD):
       raise "No valid Fujifilm Makernote!"
       
     ifd.IFD.__init__(self, file_pointer, mn_offset, ifd_offset + header_offset, data, big_endian = False)
+    
+  def getBlob(self, offset, next_ifd = 0):
+    ret_str = "FUJIFILM"
+    ret_str += byteform.itob(12, 4, big_endian = self.big_endian)
+    ret_str += ifd.IFD.getBlob(self, 12, next_ifd)
+    return ret_str
 
 class IFDWithHeader(ifd.IFD):
+  """ Base class for Makenote IFD's which have an exra header. Derived classes
+      should set two parameters:
+      - header_str:    The header string.
+      - header_length: The length of the header. This may be more than the 
+                       length of the header string, if that contains extra info.
+  """
+  
   def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
+    # Create a temporary Datablock to parse the data
     block = datablock.DataBlock(fp = file_pointer, offset = ifd_offset, data = data)
+    
+    # Read the header string
     header = block.read(len(self.header_str))
     if (header != self.header_str) and (header != ""):
       raise "No valid Makernote!"
+      
+    # Read the rest of the header and save it for writing
+    self.extra_bytes = block.read(self.header_length - len(self.header_string))
     
+    # Initialize the IFD
     ifd.IFD.__init__(self, file_pointer, ifd_offset + self.header_length, header_offset, data, big_endian)
-  
+
+  def getBlob(self, offset, next_ifd = 0):
+    """ Simple modified writeBlob, which writes the header string and the saved
+        rest of the header, followed by the data. """
+        
+    ret_str = header_str
+    ret_str += ifd.IFD.getBlob(self, offset, next_ifd)
+    return ret_str
+
 class MinoltaIFD(ifd.IFD):
   tags = qdb.QDB()
   tags.addList("name", [])
@@ -105,3 +133,11 @@ class PanasonicIFD(ifd.IFD):
   tags.addList("num", [])
   tags.addList("data_type", [])
   tags.addList("count", [])
+  
+  def getBlob(self, offset, next_ifd = 0):
+    ret_str = header_str
+    ret_str += ifd.IFD.getBlob(self, offset, None) # Panasonic does not write a next IFD pointer
+    return ret_str
+    
+  def getSize(self):
+    return ifd.IFD.getSize(self, False)

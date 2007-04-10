@@ -141,6 +141,8 @@ class IFD(metainfofile.MetaInfoRecord):
     self.ifd_offset    = ifd_offset
     self.header_offset = header_offset
     self.big_endian    = big_endian
+    
+    self.next_ifd_offset = 0
 
     # The fields dict stores all the tags read from disk and/or set by the user.
     self.mapDiskFields()
@@ -182,6 +184,7 @@ class IFD(metainfofile.MetaInfoRecord):
         else:
           tag = Tag(self.read(num_bytes, payload_offset + self.header_offset), data_type)
         self.fields[tag_type] = tag
+      self.next_ifd_offset = byteform.btoi(self.read(4), big_endian = self.big_endian)
 
   def getTag(self, tag_num):
     """Returns the payload from a certain tag number. """
@@ -276,8 +279,9 @@ class IFD(metainfofile.MetaInfoRecord):
     except KeyError:
       pass
     
-  def getSize(self):
-    """ Calculate the byte size of the IFD. """
+  def getSize(self, next_ifd = True):
+    """ Calculate the byte size of the
+    IFD. """
     
     if not (self.hasTags()):
       # If we don't have any tags, length is zero
@@ -285,10 +289,11 @@ class IFD(metainfofile.MetaInfoRecord):
     else:
       tag_nums = self.fields.keys()
       
-      # An IFD always needs 2 bytes at the start to specify the number of fields,
-      # and 4 bytes between the fields and the data for the byte offset to the
-      # next IFD
-      size = 6
+      # An IFD always needs 2 bytes at the start to specify the number of fields
+      size = 2
+      
+      # If we should write a next IFD pointer, we need four bytes
+      size += 4
       
       # For each field, we need 12 bytes
       size += 12 * len(tag_nums)
@@ -307,6 +312,7 @@ class IFD(metainfofile.MetaInfoRecord):
     """Returns the entry stream and the data stream for writing the IFD. offset
     is the offset to byte addresses specified in tghe IFD (usually the size of
     the TIFF header). next_ifd is the byte position for the next IFD, if any.
+    If next_ifd is set to None, it will be omitted
     """
     
     if not (self.hasTags()):
@@ -315,25 +321,29 @@ class IFD(metainfofile.MetaInfoRecord):
     else:
       tag_nums = self.getTagNums()
   
-      # Calculate the offset at which we may write data (after the offset, 2 bytes
-      # at the start of the IFD, 12 bytes for each field, and four bytes as
-      # pointer to the next IFD
-      data_offset = offset + 12 * len(tag_nums) + 6
-     
       # For writing the data, we split the stream in two; one part contains the
       # 12-byte fields specifying tags, data type, etc. and the other one contains
       # the encoded data (which is over 4 bytes in size). At the end, these two
       # fields will be concatenated
       fields_stream = byteform.itob(len(tag_nums), 2, big_endian = self.big_endian)
-      data_stream   = byteform.itob(next_ifd, 4, big_endian = self.big_endian)
+      data_stream = ""
       
+      # Calculate the offset at which we may write data (after the offset, 2
+      # bytes at the start of the IFD and 12 bytes for each field
+      data_offset = offset + 12 * len(tag_nums) + 2
+
+      # If we have a pointer to the next IFD, write it to the data stream
+      if (next_ifd != None):
+        data_stream = byteform.itob(next_ifd, 4, big_endian = self.big_endian)
+        data_offset += 4
+
       # Write each tag
       for tag_num in tag_nums:
         tag       = self.fields[tag_num]
         data_type = tag.getDataType()
         data      = tag.getData()
         count     = len(data) / DATA_TYPES[data_type].word_width
-          
+        
         # Write the tag number, data type and data count
         fields_stream += byteform.itob(tag_num, 2, big_endian = self.big_endian)
         fields_stream += byteform.itob(data_type, 2, big_endian = self.big_endian)

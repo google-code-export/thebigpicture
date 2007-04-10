@@ -33,13 +33,9 @@ import types
 # segment is occupied by the comment.
 
 # The different kinds of segments and their numbers
-SEGMENTS = ["APP0", "APP1", "APP2", "APP3", "APP4", "APP5", "APP6", "APP7", "APP8", "APP9", "APP10", "APP11", "APP12", "APP13", "APP14", "APP15", "COM", "DQT", "DRI", "DHT", "SOF0", "SOF1", "SOF2", "SOF3", "SOS", "EOI"]
+SEGMENTS = ["APP0", "APP1", "APP2", "APP3", "APP4", "APP5", "APP6", "APP7", "APP8", "APP9", "APP10", "APP11", "APP12", "APP13", "APP14", "APP15", "DQT", "SOF0", "SOF1", "SOF2", "SOF3", "DHT", "DRI", "SOS", "COM", "EOI"]
 
 SEG_NUMS = {
-  "DQT":   0xDB,
-  "DHT":   0xC4,
-  "DRI":   0xDD,
-  "COM":   0xFE,
   "APP0":  0xE0,
   "APP1":  0xE1,
   "APP2":  0xE2,
@@ -56,11 +52,15 @@ SEG_NUMS = {
   "APP13": 0xED,
   "APP14": 0xEE,
   "APP15": 0xEF,
+  "DQT":   0xDB,
   "SOF0":  0xC0,
   "SOF1":  0xC1,
   "SOF2":  0xC2,
   "SOF3":  0xC3,
+  "DHT":   0xC4,
+  "DRI":   0xDD,
   "SOS":   0xDA,
+  "COM":   0xFE,
   "EOI":   0xD9
 }
 
@@ -208,7 +208,6 @@ class Jpeg(metainfofile.MetaInfoFile):
       # some file seeking too! The 2 is for the 2 bytes specifying the segment
       # length.
       else:
-        segment.getDataOffset() + segment.getDataLength()
         self.fp.seek(segment.getDataOffset() + segment.getDataLength()) 
     
   def loadExif(self):
