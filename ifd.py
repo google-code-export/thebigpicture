@@ -231,8 +231,8 @@ class IFD(metainfofile.MetaInfoRecord):
         raise TypeError, "When setting an IFD tag directly with binary data, you need to specify exactly one data type"
     # Otherwise, encode the tag ourselve
     else:
-      # Make sure the payload is in a sequence      
-      if (type(payload) not in [types.ListType, types.TupleType]):
+      # Make sure the payload is in a sequence or string 
+      if (type(payload) not in [types.ListType, types.TupleType, types.StringType]):
         payload = [payload]
         
       # Check if the supplied data is of correct length
@@ -300,6 +300,7 @@ class IFD(metainfofile.MetaInfoRecord):
         num_bytes = tag.getDataLength()
         if (num_bytes > 4):
           size += num_bytes
+          
       return size
     
   def getBlob(self, offset, next_ifd = 0):

@@ -138,7 +138,7 @@ class MetaInfoBlock:
       else:
         raise ValueError, "Unknown record %s!" % record
     else:
-      raise TyepError, "I can't make sense of an record of type %s!" % type(record)
+      raise TypeError, "I can't make sense of an record of type %s!" % type(record)
 
   def __getRecordAndTagNum__(self, tag, record = None):
     """ Return the record number and tag number for the supplied tag (name or
