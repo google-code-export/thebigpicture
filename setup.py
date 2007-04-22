@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name = 'thebigpicture',
-      version = 'v1-alpha1',
+      version = 'v1-alpha2',
       packages = ['TBP'],
       description = 'Read and write metadata in Jpeg and Tiff files',
       author = 'Pieter Edelman',

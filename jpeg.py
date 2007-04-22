@@ -32,36 +32,79 @@ import types
 # JPEG Comments have their own segment, identified by \xfe (COM). The entire
 # segment is occupied by the comment.
 
-# The different kinds of segments and their numbers
-SEGMENTS = ["APP0", "APP1", "APP2", "APP3", "APP4", "APP5", "APP6", "APP7", "APP8", "APP9", "APP10", "APP11", "APP12", "APP13", "APP14", "APP15", "DQT", "SOF0", "SOF1", "SOF2", "SOF3", "DHT", "DRI", "SOS", "COM", "EOI"]
+# The different kinds of segments that can be load and written before the
+# image data
+SEGMENTS = ["APP0", "APP1", "APP2", "APP3", "APP4", "APP5", "APP6", "APP7",
+            "APP8", "APP9", "APP10", "APP11", "APP12", "APP13", "APP14",
+            "APP15", "COM", "DQT", "DHT", "DAC", "DRI"]
+
+#EXIF = [soi, app1, app2, dqt, dht, dri, sof, sos, eoi]
+#jfif = [soi, app0[0-n], sof[0-m], eoi]
 
 SEG_NUMS = {
-  "APP0":  0xE0,
-  "APP1":  0xE1,
-  "APP2":  0xE2,
-  "APP3":  0xE3,
-  "APP4":  0xE4,
-  "APP5":  0xE5,
-  "APP6":  0xE6,
-  "APP7":  0xE7,
-  "APP8":  0xE8,
-  "APP9":  0xE9,
-  "APP10": 0xEA,
-  "APP11": 0xEB,
-  "APP12": 0xEC,
-  "APP13": 0xED,
-  "APP14": 0xEE,
-  "APP15": 0xEF,
-  "DQT":   0xDB,
-  "SOF0":  0xC0,
-  "SOF1":  0xC1,
-  "SOF2":  0xC2,
-  "SOF3":  0xC3,
-  "DHT":   0xC4,
-  "DRI":   0xDD,
-  "SOS":   0xDA,
-  "COM":   0xFE,
-  "EOI":   0xD9
+  "SOF0":  0xC0, # 192
+  "SOF1":  0xC1, # 193
+  "SOF2":  0xC2, # 194
+  "SOF3":  0xC3, # 195
+  "DHT":   0xC4, # 196
+  "SOF5":  0xC5, # 197
+  "SOF6":  0xC6, # 198
+  "SOF7":  0xC7, # 199
+  "JPG":   0xC8, # 200
+  "SOF9":  0xC9, # 201
+  "SOF10": 0xCA, # 202
+  "SOF11": 0xCB, # 203
+  "DAC":   0xCC, # 204
+  "SOF13": 0xCD, # 205
+  "SOF14": 0xCE, # 206
+  "SOF15": 0xCF, # 207
+  "RST0":  0xD0, # 208
+  "RST1":  0xD1, # 209
+  "RST2":  0xD2, # 210
+  "RST3":  0xD3, # 211
+  "RST4":  0xD4, # 212
+  "RST5":  0xD5, # 213
+  "RST6":  0xD6, # 214
+  "RST7":  0xD7, # 215
+  "SOI":   0xD8, # 216
+  "EOI":   0xD9, # 217
+  "SOS":   0xDA, # 218
+  "DQT":   0xDB, # 219
+  "DNL":   0xDC, # 220
+  "DRI":   0xDD, # 221
+  "DHP":   0xDE, # 222
+  "EXP":   0xDF, # 223
+  "APP0":  0xE0, # 224
+  "APP1":  0xE1, # 225
+  "APP2":  0xE2, # 226
+  "APP3":  0xE3, # 227
+  "APP4":  0xE4, # 228
+  "APP5":  0xE5, # 229
+  "APP6":  0xE6, # 230
+  "APP7":  0xE7, # 231
+  "APP8":  0xE8, # 232
+  "APP9":  0xE9, # 233
+  "APP10": 0xEA, # 234
+  "APP11": 0xEB, # 235
+  "APP12": 0xEC, # 236
+  "APP13": 0xED, # 237
+  "APP14": 0xEE, # 238
+  "APP15": 0xEF, # 239
+  "JPG0":  0xF0, # 240
+  "JPG1":  0xF1, # 241
+  "JPG2":  0xF2, # 242
+  "JPG3":  0xF3, # 243
+  "JPG4":  0xF4, # 244
+  "JPG5":  0xF5, # 245
+  "JPG6":  0xF6, # 246
+  "JPG7":  0xF7, # 247
+  "JPG8":  0xF8, # 248
+  "JPG9":  0xF9, # 249
+  "JPG10": 0xFA, # 250
+  "JPG11": 0xFB, # 251
+  "JPG12": 0xFC, # 252
+  "JPG13": 0xFD, # 253
+  "COM":   0xFE  # 254
 }
 
 class Segment(datablock.DataBlock):
@@ -183,6 +226,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     self.ps_info      = None
     
     # Parse the header
+    self.image_data_offset = None
     self.parseFile(offset)
 
   def parseFile(self, offset):
@@ -195,18 +239,26 @@ class Jpeg(metainfofile.MetaInfoFile):
 
     # Read the file
     while (data != ""):
-      segment = Segment(self.fp, self.fp.tell())
+      curr_offset = self.fp.tell()
+      segment = Segment(self.fp, curr_offset)
       part_type = segment.getNumber()
-      self.segments[part_type].append(segment)
       
-      # At the Scan Header, the segment structure stops, and so should we 
-      if (part_type == SEG_NUMS["SOS"]):
+      # We read only until the start of the image data, which is at an SOF in
+      # the case of normal and progressive Jpeg, and DHP in the case of 
+      # hierarchical Jpeg
+      if (part_type in [SEG_NUMS["SOF0"], SEG_NUMS["SOF1"], SEG_NUMS["SOF2"],
+                        SEG_NUMS["SOF3"], SEG_NUMS["SOF5"], SEG_NUMS["SOF6"],
+                        SEG_NUMS["SOF7"], SEG_NUMS["SOF9"], SEG_NUMS["SOF10"],
+                        SEG_NUMS["SOF11"], SEG_NUMS["SOF13"], SEG_NUMS["SOF15"],
+                        SEG_NUMS["DHP"]]):
+        self.image_data_offset = curr_offset
         break
         
-      # Otherwise, seek to the next segment.
+      # Otherwise, store the segment and seek to the next one.
       # WARNING: the value needs to be absolute, because the Segment class does
       # some file seeking too!
       else:
+        self.segments[part_type].append(segment)
         self.fp.seek(segment.getDataOffset() + segment.getDataLength()) 
     
   def loadExif(self):
@@ -306,10 +358,12 @@ class Jpeg(metainfofile.MetaInfoFile):
         # Write the segment
         out_fp.write(segment.getBlob())
         
-    # Write the image data, which starts after the SOS segment
-    segment = self.segments[SEG_NUMS["SOS"]][-1]
-    self.fp.seek(segment.getDataOffset() + segment.getDataLength())
-    out_fp.write(self.fp.read())
+    # Write the image data
+    if (self.image_data_offset): # We only do the check here and not in the parsing, so we can still extract metadata from a broken image file
+      self.fp.seek(self.image_data_offset)
+      out_fp.write(self.fp.read())
+    else:
+      raise "Due to an error in the parsing of the file, it can not be written."
     
     out_fp.close()
     
