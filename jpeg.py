@@ -38,9 +38,7 @@ SEGMENTS = ["APP0", "APP1", "APP2", "APP3", "APP4", "APP5", "APP6", "APP7",
             "APP8", "APP9", "APP10", "APP11", "APP12", "APP13", "APP14",
             "APP15", "COM", "DQT", "DHT", "DAC", "DRI"]
 
-#EXIF = [soi, app1, app2, dqt, dht, dri, sof, sos, eoi]
-#jfif = [soi, app0[0-n], sof[0-m], eoi]
-
+# All segments and their numbers specified by the Jpeg spec
 SEG_NUMS = {
   "SOF0":  0xC0, # 192
   "SOF1":  0xC1, # 193

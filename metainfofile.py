@@ -219,6 +219,9 @@ class MetaInfoRecord(datablock.DataBlock):
     
     return (len(self.fields) > 0)
 
+# Only import these here, as the need to have MetaInfoRecord loaded first
+import exif, iptc
+
 class MetaInfoFile:
   """ The base class for files containing meta information. """
   
@@ -298,10 +301,15 @@ class MetaInfoFile:
         it from disk. By using this method rather the self.exif, it is possible
         to load the Exif data only when requested, which results in a better
         speed. """
-        
+
+    # If we don't have any Exif info yet, load it
     if (self.exif == None):
       self.loadExif()
-      
+
+    # If we didn't find anything, create a new empty Exif object
+    if (self.exif == None):
+      self.exif = exif.Exif()
+
     return self.exif
 
   def __getIPTC__(self):
@@ -309,8 +317,13 @@ class MetaInfoFile:
         loads it from disk. By using this method rather the self.exif, it is
         possible to load the IPTC/NAA data only when requested, which results in
         a better speed. """
-    
+
+    # If we didn't load any IPTC info yet, do so
     if (self.iptc == None):
       self.loadIPTC()
 
+    # If we couldn't load anything, create an empty IPTC object
+    if (self.iptc == None):
+      self.iptc = IPTCNAA.IPTC()
+    
     return self.iptc

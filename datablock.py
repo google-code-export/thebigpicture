@@ -39,7 +39,7 @@ class DataBlock:
   def setData(self, data):
     """ Set the data of the tag to the specified binary string. """
 
-    self.data        = data
+    self.data        = buffer(data)
     self.fp          = None
     self.data_offset = None
     self.length      = None
