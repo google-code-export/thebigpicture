@@ -72,7 +72,7 @@ class Tiff(metainfofile.MetaInfoFile):
     
   def loadExif(self):
     # Read the Exif data
-    self.exif = exif.Exif(self.fp, self.exif_offset, self.offset, self.big_endian)
+    self.exif = exif.Exif(self.exif_offset, self.offset, fp = self.fp, big_endian = self.big_endian)
 
   def loadIPTC(self):
     # Get the IPTC block. The paylaod should simply be the encoded IPTC data

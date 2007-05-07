@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import metainfofile, ifd, qdb, makernote
+import metainfofile, ifd, qdb, makernote, datablock
 
 # The Tiff IFD (first part off IFD0 in Tiff file).
 class TiffIFD(ifd.IFD):
@@ -68,15 +68,17 @@ MAKERNOTES = {
   "Panasonic":      makernote.PanasonicIFD
 }
 
-class Exif(metainfofile.MetaInfoBlock):    
-  def __init__(self, file_pointer, ifd_offset, header_offset = 0, big_endian = True):
-    """ Read and write an Exif segment in a file. TODO: loading from memory. """
+class Exif(metainfofile.MetaInfoBlock, datablock.DataBlock):    
+  def __init__(self, ifd_offset = 0, header_offset = 0, fp = None, length = None, data = None, big_endian = True):
+    """ Read and write an Exif segment in a file. """
     
-    self.fp            = file_pointer
     self.ifd_offset    = ifd_offset
     self.header_offset = header_offset
     self.big_endian    = big_endian
 
+    # Call the DataBlock constructor
+    datablock.DataBlock.__init__(self, fp, ifd_offset + header_offset, data)
+    
     # Create the database of segment data
     self.records = qdb.QDB()
     # The segment numbers, although Exif does not have an official numbering
@@ -98,7 +100,7 @@ class Exif(metainfofile.MetaInfoBlock):
     if (rec_obj == None):
       # Load Tiff
       if (rec_num == 1):
-        rec_obj = TiffIFD(self.fp, self.ifd_offset, self.header_offset, big_endian = self.big_endian)
+        rec_obj = TiffIFD(self.fp, self.ifd_offset, self.header_offset, self.data, big_endian = self.big_endian)
         
       elif (rec_num in [2, 3, 5, 6]):
         # For Exif, GPS, Makernote and IFD1, the Tiff structure is needed
@@ -108,7 +110,7 @@ class Exif(metainfofile.MetaInfoBlock):
         if (rec_num == 2):
           offset = tiff.getTag(34665)
           if (offset):
-            rec_obj = ExifIFD(self.fp, offset, self.header_offset, big_endian = self.big_endian)
+            rec_obj = ExifIFD(self.fp, offset, self.header_offset, self.data, big_endian = self.big_endian)
           else:
             rec_obj = ExifIFD(big_endian = self.big_endian)
         
@@ -116,7 +118,7 @@ class Exif(metainfofile.MetaInfoBlock):
         elif (rec_num == 3):
           offset = tiff.getTag(34853)
           if (offset):
-            rec_obj = GPSIFD(self.fp, offset, self.header_offset, big_endian = self.big_endian)
+            rec_obj = GPSIFD(self.fp, offset, self.header_offset, self.data, big_endian = self.big_endian)
           else:
             rec_obj = GPSIFD(big_endian = self.big_endian)
 
@@ -137,7 +139,7 @@ class Exif(metainfofile.MetaInfoBlock):
                 makernote_offset = exif.fields[37500].getDataOffset() - self.header_offset
                 try:
                   # Try to construct the makernote
-                  rec_obj = MAKERNOTES[make](self.fp, makernote_offset, self.header_offset, big_endian = self.big_endian)
+                  rec_obj = MAKERNOTES[make](self.fp, makernote_offset, self.header_offset, self.data, big_endian = self.big_endian)
                 except:
                   pass
               if not (rec_obj):
@@ -147,7 +149,7 @@ class Exif(metainfofile.MetaInfoBlock):
         elif (rec_num == 6):
           ifd1_offset = tiff.next_ifd_offset
           if (ifd1_offset):
-            rec_obj = TiffIFD(self.fp, ifd1_offset, self.header_offset, big_endian = self.big_endian)
+            rec_obj = TiffIFD(self.fp, ifd1_offset, self.header_offset, self.data, big_endian = self.big_endian)
           else:
             rec_obj = TiffIFD(big_endian = self.big_endian)
 
@@ -156,7 +158,7 @@ class Exif(metainfofile.MetaInfoBlock):
         exif = self.getRecord(2)
         offset = exif.getTag(40965)
         if (offset):
-          rec_obj = InteropIFD(self.fp, offset, self.header_offset, big_endian = self.big_endian)
+          rec_obj = InteropIFD(self.fp, offset, self.header_offset, self.data, big_endian = self.big_endian)
         else:
           rec_obj = InteropIFD(big_endian = self.big_endian)
       
@@ -268,8 +270,8 @@ class Exif(metainfofile.MetaInfoBlock):
     if (ifd1 != False):
       offset = ifd1.getTag(513) # JPEGInterchangeFormat
       length = ifd1.getTag(514) # JPEGInterchangeFormatLength
-      self.fp.seek(self.header_offset + offset)
-      data = self.fp.read(length)
+      self.seek(self.header_offset + offset)
+      data = self.read(length)
       
     return data
       

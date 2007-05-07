@@ -320,13 +320,13 @@ class Jpeg(metainfofile.MetaInfoFile):
     exif = self.__getExif__()
     if (exif.hasTags()):
       if (not self.exif_segment):
-        self.exif_segment = Segment(SEG_NUMS[APP1], byte_str)
-        self.segments[SEG_NUMS[APP1]].append(self.exif_segment)
+        self.exif_segment = Segment(SEG_NUMS["APP1"], byte_str)
+        self.segments[SEG_NUMS["APP1"]].append(self.exif_segment)
       else:
         self.exif_segment.setData(byte_str)
     else:
       if (self.exif_segment):
-        del self.segments[SEG_NUMS[APP1]][self.segments[SEG_NUMS[APP1]].index(self.exif_segment)]
+        del self.segments[SEG_NUMS["APP1"]][self.segments[SEG_NUMS[APP1]].index(self.exif_segment)]
         self.exif_segment = None
     
     # Prepare the IPTC segment for writing. FIXME: This
