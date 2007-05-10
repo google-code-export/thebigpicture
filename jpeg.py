@@ -323,7 +323,8 @@ class Jpeg(metainfofile.MetaInfoFile):
         self.exif_segment = Segment(SEG_NUMS["APP1"], byte_str)
         self.segments[SEG_NUMS["APP1"]].append(self.exif_segment)
       else:
-        self.exif_segment.setData(byte_str)
+        self.exif_segment.setData(byte_str, 0)
+        print repr(self.exif_segment.getData())
     else:
       if (self.exif_segment):
         del self.segments[SEG_NUMS["APP1"]][self.segments[SEG_NUMS[APP1]].index(self.exif_segment)]
@@ -339,7 +340,7 @@ class Jpeg(metainfofile.MetaInfoFile):
       if (not self.ps_info):
         self.ps_info = photoshop.Photoshop()
       self.ps_info.setTag(1028, self.__getIPTC__().getBlob())
-      self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock())
+      self.iptc_segment.setData("Photoshop 3.0\x00" + self.ps_info.getDataBlock(), 0)
     # If we don't have any tags, remove the IPTC segment and Photoshop info
     else:
       if (self.iptc_segment):

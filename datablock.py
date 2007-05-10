@@ -26,18 +26,21 @@ class DataBlock:
     if (fp):
       self.fp = fp
     elif (data):
-      self.setData(data)
+      self.setData(data, offset)
     else:
       self.length = 0
     
     # Keep track of the current position when reading from file or string
     self.byte_pos = self.data_offset
 
-  def setData(self, data):
-    """ Set the data of the tag to the specified binary string. """
+  def setData(self, data, offset):
+    """ Set the data of the tag to the specified binary string, along with a new
+        offset. """
 
     self.data        = buffer(data)
     self.fp          = None
+    self.data_offset = offset
+    self.seek(0)
     
   def getDataLength(self):
     """ Return the length of the data, or None if this is unknown. """

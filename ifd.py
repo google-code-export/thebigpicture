@@ -128,7 +128,10 @@ class IFD(metainfofile.MetaInfoRecord):
     self.ifd_offset    = ifd_offset
     self.header_offset = header_offset
     self.big_endian    = big_endian
+    self.fields        = {}
     
+    # The last four bytes of the non-data part of an IFD store the pointer to
+    # the next IFD.
     self.next_ifd_offset = 0
 
     # The fields dict stores all the tags read from disk and/or set by the user.
