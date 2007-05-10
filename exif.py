@@ -77,7 +77,7 @@ class Exif(metainfofile.MetaInfoBlock, datablock.DataBlock):
     self.big_endian    = big_endian
 
     # Call the DataBlock constructor
-    datablock.DataBlock.__init__(self, fp, ifd_offset + header_offset, data)
+    datablock.DataBlock.__init__(self, fp = fp, offset = ifd_offset + header_offset, data = data)
     
     # Create the database of segment data
     self.records = qdb.QDB()

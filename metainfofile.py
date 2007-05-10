@@ -50,10 +50,11 @@ class MetaInfoBlock:
       record_num, tag_num = self.__getRecordAndTagNum__(tag, record)
     except KeyError:
       # We're dealing with an unknown tag, but it may have been loaded from disk
-      if (type(tag) == types.IntType):
-        tag_num = tag
-        record_num = self.__getRecordNum__(record)
-      if (tag_num == None) and (record_num == None):
+      if (record):
+        if (type(tag) == types.IntType):
+          tag_num = tag
+          record_num = self.__getRecordNum__(record)
+      if (tag_num == None) or (record_num == None):
         raise TypeError, "Unknown tag %s, please specify tag number and record number" % str(tag)
         
     # Get the data
@@ -197,7 +198,7 @@ class MetaInfoRecord(datablock.DataBlock):
     
     # Try numeric input
     if (type(tag) == types.IntType):
-      if (self.tags.query("num", tag)):
+      if (self.tags.query("num", tag) is not False):
         tag_num = tag
     # Try text input
     elif (type(tag) == types.StringType):

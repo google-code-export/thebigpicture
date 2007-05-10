@@ -14,12 +14,15 @@ class DataBlock:
     if (fp) and (data):
       raise TypeError, "Either initialize a DataBlock with file pointer or with a binary data!"
       
-    # Check in which form we were called
+    if (not offset):
+      offset = 0 # It's possible that we're called with None as offset
+      
     self.data_offset = offset
     self.length      = length
     self.fp          = None
     self.data        = None
 
+    # Check in which form we were called
     if (fp):
       self.fp = fp
     elif (data):
@@ -52,7 +55,7 @@ class DataBlock:
         method first to seek to this position. """
     
     data = None
-
+    
     # Seek to the specified position, or otherwise make sure we're in the right
     # position
     if (seek == None): # Explicit test, because 0 is a valid value 

@@ -84,29 +84,14 @@ class Tag(datablock.DataBlock):
   """ An IFD tag. It is basically a DataBlock with a data type associated, since
       IFD tags may sometimes be encoded with differing data types. """
   
-  def __init__(self, *args):
-    """ Initialize either with file pointer, offset, length, and data type, or
-        the encoded content and data type. """
+  def __init__(self, data_type, fp = None, data = None, offset = 0, length = None, big_endian = True):
+    """ Initialize with either data type of buffer. """
       
-    # Construct a dict for the base class
-    base_kwargs = {}
-    
-    # Check if we were called with data or with file pointer
-    if (len(args) == 2):
-      base_kwargs["data"] = args[0]
-    elif (len(args) == 4):
-      base_kwargs["fp"]     = args[0]
-      base_kwargs["offset"] = args[1]
-      base_kwargs["length"] = args[2]
-    else:
-      raise TypeError, "Wrong initialization of Exif tag!"
-      
-    # The data type is always the last argument
-    self.data_type = args[-1]
+    self.data_type = data_type
       
     # Initialize the base class. The endianness does not even matter, it is
     # never used.
-    datablock.DataBlock.__init__(self, **base_kwargs)
+    datablock.DataBlock.__init__(self, fp = fp, data = data, offset = offset, length = length)
     
   def getDataType(self):
     """ Return the data type of the tag. """
@@ -126,13 +111,13 @@ class IFD(metainfofile.MetaInfoRecord):
   # The data types we know of
   DATA_TYPES = DATA_TYPES
   
-  def __init__(self, file_pointer = None, ifd_offset = None, header_offset = 0, data = None, big_endian = True):
+  def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
     
     # Construct the arguments for the base class
     base_kwargs = {}
-    if ((file_pointer) and (ifd_offset)):
-      base_kwargs["fp"]     = file_pointer
-      base_kwargs["offset"] = ifd_offset + header_offset
+    base_kwargs["offset"] = ifd_offset + header_offset
+    if (file_pointer):
+      base_kwargs["fp"] = file_pointer
     elif (data):
       base_kwargs["data"] = data
       
@@ -147,7 +132,8 @@ class IFD(metainfofile.MetaInfoRecord):
     self.next_ifd_offset = 0
 
     # The fields dict stores all the tags read from disk and/or set by the user.
-    self.mapDiskFields()
+    if (self.data) or (self.fp):
+      self.mapDiskFields()
     
   def mapDiskFields(self):
     """ Reads the exif structure from disk and maps all the fields. """
@@ -172,25 +158,24 @@ class IFD(metainfofile.MetaInfoRecord):
         num_bytes = payload_len * DATA_TYPES[data_type].word_width
           
         # The next four bytes either encode an offset te where the payload can be
-        # found, or the payload itself if it fits in these four bytes.
+        # found, or the payload itself if it fits in these four bytes. We
+        # calculate the absolute offset in the file or data stream.
         if (num_bytes < 5):
-          payload_offset = self.tell() + self.header_offset
+          payload_offset = self.tell() + self.ifd_offset + self.header_offset
           self.read(4)
         else:
-          payload_offset = byteform.btousi(self.read(4), big_endian = self.big_endian) + self.header_offset - self.ifd_offset
+          payload_offset = byteform.btousi(self.read(4), big_endian = self.big_endian) + self.header_offset# - self.ifd_offset
 
         # Store the tag. This method does not check if we know the tag type, and
         # that's exactly what we want.
-        if (self.fp):
-          tag = Tag(self.fp, payload_offset + self.ifd_offset, num_bytes, data_type)
-        else:
-          tag = Tag(self.read(num_bytes, payload_offset + self.header_offset), data_type)
+        tag = Tag(data_type, fp = self.fp, data = self.data, offset = payload_offset, length = num_bytes)
         self.fields[tag_type] = tag
+        
       self.next_ifd_offset = byteform.btoi(self.read(4), big_endian = self.big_endian)
 
   def getTag(self, tag_num):
     """Returns the payload from a certain tag number. """
-    
+
     if (tag_num in self.fields):
       tag = self.fields[tag_num]
     else:
@@ -272,7 +257,7 @@ class IFD(metainfofile.MetaInfoRecord):
         raise "Error encoding data for tag %d!" % tag_num
 
     # Set the used data type and payload
-    self.fields[tag_num] = Tag(data, data_type)
+    self.fields[tag_num] = Tag(data_type, data = data)
 
   def removeTag(self, tag_num):
     """ Remove tag with the specified number. """
