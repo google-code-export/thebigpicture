@@ -109,12 +109,10 @@ class Segment(datablock.DataBlock):
   """ A class for managing JPEG segments. """
   
   def __init__(self, num = None, fp = None, data = None, offset = 0, length = None, big_endian = True):
-    """ The segment can be initialized in three forms:
-        - With a file pointer and offset in this file to the start of the
-          segment (the 0xFF 0xXX part).
-        - With a data stream
-        - With a segment number
-    """
+    """ The segment can be initialized with file pointer/data and offset
+        complete with header, or without header. In this latter case a segment
+        number is needed, and in the case of file pointer initialization also
+        a length. """
     
     self.big_endian = big_endian
 
@@ -122,8 +120,15 @@ class Segment(datablock.DataBlock):
     datablock.DataBlock.__init__(self, fp = fp, data = data, length = length, offset = offset)
       
     if (num != None):
+      # If we're initialized with a number, we assume all data is segment
+      # content
       self.number = num
+      if (fp) and not (length):
+        raise "You need to specify the segment length!"
+        
     else:
+      # Otherwise, parse the 4-byte header, and after that make sure we exclude
+      # it from the data.
       self.number, length = self.__parseHeader__()
       self.data_offset += 4
       self.seek(0)
