@@ -108,7 +108,7 @@ SEG_NUMS = {
 class Segment(datablock.DataBlock):
   """ A class for managing JPEG segments. """
   
-  def __init__(self, *args, **kwargs):
+  def __init__(self, num = None, fp = None, data = None, offset = 0, length = None, big_endian = True):
     """ The segment can be initialized in three forms:
         - With a file pointer and offset in this file to the start of the
           segment (the 0xFF 0xXX part).
@@ -116,49 +116,26 @@ class Segment(datablock.DataBlock):
         - With a segment number
     """
     
-    if ("big_endian" in kwargs): self.big_endian = kwargs["big_endian"]
-    else: self.big_endian = True
+    self.big_endian = big_endian
+
+    # Call the DataBlock constructor
+    datablock.DataBlock.__init__(self, fp = fp, data = data, length = length, offset = offset)
       
-    # There are four different ways in which this class can be initialized, but
-    # it should always be with one or two arguments
-    if (len(args) not in [1, 2]):
-      raise "Segment class wasn't initialized properly!"
-      
-    # We construct a separate dict for the DataBlock arguments
-    base_kwargs = {}
+    if (num != None):
+      self.number = num
+    else:
+      self.number, length = self.__parseHeader__()
+      self.data_offset += 4
+      self.seek(0)
+      self.length = length
     
-    # Check the different initialization types
-    if (type(args[0]) == types.IntType):
-      # Initialized with tag num
-      self.number = args[0]
-      if (len(args) == 2):
-        base_kwargs["data"] = args[1]
-        
-    elif (type(args[0]) == types.StringType):
-      # Initialized with data string. FIXME: What about file pointer initialization?
-      self.number, length = self.__parseHeader__(args[0][:4])
-      base_kwargs["data"] = args[0][4:length + 4] # Skip first four bytes of segment header
-      
-    elif (type(args[0]) == types.FileType):
-      # Initialized with file pointer
-      
-      # Parse the header
-      fp, offset = args[0:2]
-      fp.seek(offset)
-      self.number, length = self.__parseHeader__(fp.read(4))
-      
-      # Construct the data for tag init
-      base_kwargs["fp"]     = fp
-      base_kwargs["offset"] = offset + 4 # Data starts four bytes after segment
-      base_kwargs["length"] = length
-    
-    # Call the Tag constructor
-    datablock.DataBlock.__init__(self, **base_kwargs)
-    
-  def __parseHeader__(self, header):
+  def __parseHeader__(self):
     """ Parse the first bytes of the segment header, and return a list of number
         and length. """
 
+    # Read the header
+    header = self.read(4, 0)
+    
     # The first byte of a JPEG segment header should be 0xFF
     if (header[0] != "\xFF"):
       raise "Not a JPEG segment!"
@@ -238,7 +215,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     # Read the file
     while (data != ""):
       curr_offset = self.fp.tell()
-      segment = Segment(self.fp, curr_offset)
+      segment = Segment(fp = self.fp, offset = curr_offset)
       part_type = segment.getNumber()
       
       # We read only until the start of the image data, which is at an SOF in
@@ -320,11 +297,10 @@ class Jpeg(metainfofile.MetaInfoFile):
     exif = self.__getExif__()
     if (exif.hasTags()):
       if (not self.exif_segment):
-        self.exif_segment = Segment(SEG_NUMS["APP1"], byte_str)
+        self.exif_segment = Segment(num = SEG_NUMS["APP1"], data = byte_str)
         self.segments[SEG_NUMS["APP1"]].append(self.exif_segment)
       else:
         self.exif_segment.setData(byte_str, 0)
-        print repr(self.exif_segment.getData())
     else:
       if (self.exif_segment):
         del self.segments[SEG_NUMS["APP1"]][self.segments[SEG_NUMS[APP1]].index(self.exif_segment)]
@@ -335,7 +311,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     iptc = self.__getIPTC__()
     if (iptc.hasTags()):
       if (not self.iptc_segment):
-        self.iptc_segment = Segment(SEG_NUMS["APP13"])
+        self.iptc_segment = Segment(num = SEG_NUMS["APP13"])
         self.segments[SEG_NUMS["APP13"]].append(self.iptc_segment)
       if (not self.ps_info):
         self.ps_info = photoshop.Photoshop()
@@ -385,7 +361,7 @@ class Jpeg(metainfofile.MetaInfoFile):
     """ Set the JPEG comment. If append is True, the comment will be recorded as
         an additional COM segment. """
         
-    segment = Segment(SEG_NUMS["COM"], comment)
+    segment = Segment(num = SEG_NUMS["COM"], data = comment)
     if (append):
       self.segments[SEG_NUMS["COM"]].append(segment)
     else:
