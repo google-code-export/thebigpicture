@@ -98,24 +98,30 @@ class Tag(datablock.DataBlock):
     return self.data_type
       
 class IFD(metainfofile.MetaInfoRecord):
-  """An IFD (Image File Directory) represents an elementary data type in both a
-  Tiff and an Exif file. It has a certain ifd_offset in the file. A
-  header_offset may also be specified to determine the start of the enclosing,
-  larger part (APP1 for example). Offsets in an IFD are measured from this
-  number. This class functions as a base class.
-  Derived classes need to specify a QDB called tags, which holds the names,
-  numbers, data types and counts for each tag.
-  After loading, the class has a variable called next_ifd_offset, which 
-  specifies the read offset to the next IFD. """
+  """ An IFD (Image File Directory) represents an elementary data type in both a
+      Tiff and an Exif file. This class functions as a base class.
+      Derived classes need to specify a QDB called tags, which holds the names,
+      numbers, data types and counts for each tag.
+      After loading, the class has a variable called next_ifd_offset, which 
+      specifies the read offset to the next IFD. """
 
   # The data types we know of
   DATA_TYPES = DATA_TYPES
   
   def __init__(self, file_pointer = None, ifd_offset = 0, header_offset = 0, data = None, big_endian = True):
+    """ Initialize the IFD data with the ifd_offset of the IFD in the 
+        containing structure (like the segment), the header_offset to the
+        containing structure in the file or data buffer, and pointer to an open
+        file of data buffer. The big_endian parameter specifies whther the data
+        is in big endian format.
+    """
     
     # Construct the arguments for the base class
     base_kwargs = {}
-    base_kwargs["offset"] = ifd_offset + header_offset
+    # Since all offsets are specified relative to the start of the containing
+    # structure, we use this as the start for the DataBlock. This way, all
+    # reading and seeking will be correct.
+    base_kwargs["offset"] = header_offset
     if (file_pointer):
       base_kwargs["fp"] = file_pointer
     elif (data):
@@ -137,7 +143,7 @@ class IFD(metainfofile.MetaInfoRecord):
     # The fields dict stores all the tags read from disk and/or set by the user.
     if (self.data) or (self.fp):
       self.mapDiskFields()
-    
+   
   def mapDiskFields(self):
     """ Reads the exif structure from disk and maps all the fields. """
     self.fields = {} # Empty the map
@@ -145,7 +151,7 @@ class IFD(metainfofile.MetaInfoRecord):
     # Go to the proper offset and read the first two bytes. They represent the
     # number of fields in the IFD
     if (self.getDataLength() > 0) or (self.getDataLength() == None): # Parse when there's data, or when data size is unknown
-      self.seek(0)
+      self.seek(self.ifd_offset)
       num_fields = byteform.btousi(self.read(2), big_endian = self.big_endian)
   
       for field_num in range(num_fields):
@@ -160,11 +166,11 @@ class IFD(metainfofile.MetaInfoRecord):
         # the number of characters to get the total number of bytes.
         num_bytes = payload_len * DATA_TYPES[data_type].word_width
           
-        # The next four bytes either encode an offset te where the payload can be
-        # found, or the payload itself if it fits in these four bytes. We
+        # The next four bytes either encode an offset te where the payload can
+        # be found, or the payload itself if it fits in these four bytes. We
         # calculate the absolute offset in the file or data stream.
         if (num_bytes < 5):
-          payload_offset = self.tell() + self.ifd_offset + self.header_offset
+          payload_offset = self.tell() + self.header_offset
           self.read(4)
         else:
           payload_offset = byteform.btousi(self.read(4), big_endian = self.big_endian) + self.header_offset# - self.ifd_offset

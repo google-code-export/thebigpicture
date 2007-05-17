@@ -69,15 +69,27 @@ MAKERNOTES = {
 }
 
 class Exif(metainfofile.MetaInfoBlock, datablock.DataBlock):    
+  """ Read and write an Exif segment in a file. """
+  
   def __init__(self, ifd_offset = 0, header_offset = 0, fp = None, length = None, data = None, big_endian = True):
-    """ Read and write an Exif segment in a file. """
+    """ Initialize the Exif data with the ifd_offset of the IFD in the 
+        containing structure (like the segment), the header_offset to the
+        containing structure in the file or data buffer, pointer to an open
+        file of data buffer, and optionally the length of the actual data. The
+        big_endian parameter specifies whther the data is in big endian format.
+    """
     
+    # We save both the header offset (to the containing structure) and the
+    # ifd offset (in the containing structure). Since all offsets are specified
+    # relative to the start of the containing structure, we use this as the
+    # start for the DataBlock. This way, all reading and seeking will be
+    # correct.
     self.ifd_offset    = ifd_offset
     self.header_offset = header_offset
     self.big_endian    = big_endian
 
     # Call the DataBlock constructor
-    datablock.DataBlock.__init__(self, fp = fp, offset = ifd_offset + header_offset, data = data)
+    datablock.DataBlock.__init__(self, fp = fp, offset = header_offset, data = data)
     
     # Create the database of segment data
     self.records = qdb.QDB()
@@ -270,7 +282,7 @@ class Exif(metainfofile.MetaInfoBlock, datablock.DataBlock):
     if (ifd1 != False):
       offset = ifd1.getTag(513) # JPEGInterchangeFormat
       length = ifd1.getTag(514) # JPEGInterchangeFormatLength
-      self.seek(self.header_offset + offset)
+      self.seek(offset)
       data = self.read(length)
       
     return data
