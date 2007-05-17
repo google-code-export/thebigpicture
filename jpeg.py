@@ -265,11 +265,11 @@ class Jpeg(metainfofile.MetaInfoFile):
     if (self.iptc == None):
       for seg in self.segments[SEG_NUMS["APP13"]]:
         if (seg.read(14, 0) == "Photoshop 3.0\x00"):
-          ps = photoshop.Photoshop(self.fp, self.fp.tell(), seg.getDataLength())
+          ps = photoshop.Photoshop(fp = self.fp, offset = self.fp.tell(), length = seg.getDataLength())
           if (1028 in ps.tags): # IPTC info is tag 1028
             self.iptc_segment = seg
             self.ps_info      = ps
-            self.iptc = iptcnaa.IPTC(self.fp, ps.getDataOffset() + ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
+            self.iptc = iptcnaa.IPTC(self.fp, ps.tags[1028].getDataOffset(), ps.tags[1028].getDataLength())
 
     # If we didn't find IPTC info, create an empty object and the containing
     # structures
