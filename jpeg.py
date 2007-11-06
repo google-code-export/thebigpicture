@@ -18,7 +18,7 @@
 # 
 
 # Import the custom modules
-import exif, tiff, metainfofile, byteform, datablock, iptcnaa, photoshop
+import exif, tiff, metainfofile, byteform, datablock, iptcnaa, photoshop, convenience
 # Import standard Python modules
 import types
 
@@ -182,8 +182,8 @@ class Jpeg(metainfofile.MetaInfoFile):
     
     # Initialize the file pointer
     if (type(file_indicator) == types.StringType):
-      self.fp = open(file_indicator, "rb")
-    elif (type(file_indicator) == types.FileType):
+      self.fp = convenience.PersistentFileHandle(file_indicator, "rb")
+    elif isinstance(file_indicator, convenience.PersistentFileHandle):
       self.fp = file_indicator
     else:
       raise "No valid file parameter given -- file path or file object needed." 
@@ -278,7 +278,7 @@ class Jpeg(metainfofile.MetaInfoFile):
 
   def writeFile(self, file_path):
     # Open the new file for writing
-    out_fp = open(file_path, "wb")
+    out_fp = convenience.PersistentFileHandle(file_path, "wb")
     out_fp.write("\xff\xd8")
     
     # Prepare the Exif segment for writing

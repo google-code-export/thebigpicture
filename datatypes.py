@@ -94,8 +94,8 @@ class Ascii(DataType):
   
   @classmethod
   def encode(cls, stream, is_big_endian = True):
-    """ Basically, set the data to the supplied string. The
-    is_big_endian parameter is only here for compatibility reasons. """
+    """ Basically, set the data to the supplied string. The is_big_endian
+        parameter is only here for compatibility reasons. """
     
     # We cannot support multiple strings, but we can encode a single string
     # inside a list

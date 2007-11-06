@@ -18,7 +18,7 @@
 # 
 
 # Import local classes
-import ifd, exif, metainfofile, byteform, iptcnaa
+import ifd, exif, metainfofile, byteform, iptcnaa, convenience
 
 # Import python modules
 import types
@@ -33,8 +33,8 @@ class Tiff(metainfofile.MetaInfoFile):
     
     # Initialize the file pointer
     if (type(file_indicator) == types.StringType):
-      self.fp = open(file_indicator, "rb")
-    elif (type(file_indicator) == types.FileType):
+      self.fp = convenience.PersistentFileHandle(file_indicator, "rb")
+    elif isinstance(file_indicator, convenience.PersistentFileHandle):
       self.fp = file_indicator
     else:
       raise "No valid file parameter given -- file path or file object needed." 
@@ -98,7 +98,7 @@ class Tiff(metainfofile.MetaInfoFile):
           
   def writeFile(self, file_path):
     # Write the header
-    out_fp = open(file_path, "wb")
+    out_fp = convenience.PersistentFileHandle(file_path, "wb")
     if (self.big_endian):
       out_fp.write("\x4d\x4d")
     else:

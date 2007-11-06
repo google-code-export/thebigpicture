@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
 
-import byteform, datablock, qdb, types
+import byteform, datablock, qdb, types, shutil
    
 class MetaInfoBlock:
   """ The base class for a particuler kind of metainformation structure, like
@@ -296,6 +296,14 @@ class MetaInfoFile:
         where the tag belongs. """
         
     self.__getIPTC__().removeTag(tag, record)
+    
+  def rename(self, new_path):
+    """ Renames the file to the new specifief path. """
+    
+    self.fp.close()
+    shutil.move(self.fp.filename , new_path)
+    self.fp.filename = new_path
+    self.fp.open()
       
   def __getExif__(self):
     """ Return the file's Exif object. If it's not loaded yet, this method loads

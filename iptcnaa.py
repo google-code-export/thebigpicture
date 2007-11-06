@@ -24,7 +24,7 @@ class IPTCEnvelope(iptc.IPTCRecord):
   tags = qdb.QDB()
   tags.addList("name", ["EnvelopeRecordVersion", "Destination", "FileFormat", "FileVersion", "ServiceIdentifier", "EnvelopeNumber", "ProductID", "EnvelopePriority", "DateSent", "TimeSent", "CodedCharacterSet", "UniqueObjectName", "ARMIdentifier", "ARMVersion"])
   tags.addList("num", [0, 5, 20, 22, 30, 40, 50, 60, 70, 80, 90, 100, 120, 122])
-  tags.addList("count", [1, 1, 1, 1, [0, 10], 8, [0, 32], 1, 8, 11, [0.32], [14, 80], 1, 1])
+  tags.addList("count", [1, 1, 1, 1, [0, 10], 8, [0, 32], 1, 8, 11, [0, 32], [14, 80], 1, 1])
   tags.addList("data_type", [3, 2, 3, 3, 2, 15, 2, 15, 15, 2, 2, 2, 3, 3])
 
 class IPTCApplication(iptc.IPTCRecord):
